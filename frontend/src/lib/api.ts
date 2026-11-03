@@ -29,11 +29,19 @@ export interface PlanDetectionStatus {
   lastError: string | null;
 }
 
+export interface CalendarStatus {
+  /** Whether Calendar Entries can be created right now. */
+  connected: boolean;
+  /** Why not, and what to do (null when connected). */
+  reason: string | null;
+}
+
 export interface AppStatus {
   mode: Mode;
   messageSource: MessageSourceStatus;
   firstImport: FirstImportStatus;
   planDetection: PlanDetectionStatus;
+  calendar: CalendarStatus;
 }
 
 export const PLATFORMS = ["imessage", "instagram", "messenger", "whatsapp", "discord"] as const;
@@ -58,7 +66,8 @@ export interface Chat {
   excluded: boolean;
 }
 
-export type DetectedEventStatus = "pending_review" | "confirmed" | "dismissed";
+/** `confirming` only while its Calendar Entry is being created. */
+export type DetectedEventStatus = "pending_review" | "confirming" | "confirmed" | "dismissed";
 
 /** A plan found in a Chat, shown beneath its Anchor Message. */
 export interface DetectedEvent {
@@ -74,8 +83,23 @@ export interface DetectedEvent {
   location: string | null;
   confidence: number;
   status: DetectedEventStatus;
+  /** Its Calendar Entry, once Confirmed. */
+  calendarEntryId: string | null;
   createdAt: string;
   updatedAt: string;
+}
+
+/**
+ * Edits made before confirming. Timed: `start`/`end` are ISO 8601 with offset. All-day: they
+ * are YYYY-MM-DD, the first and last day (inclusive). A null `end`: no end (a timed plan
+ * gets the default length).
+ */
+export interface ConfirmEdits {
+  title: string;
+  allDay: boolean;
+  start: string;
+  end: string | null;
+  location: string | null;
 }
 
 export interface Message {
@@ -185,6 +209,13 @@ export const api = {
   /** Dismiss a Pending Review Detected Event; resolves to it, now Dismissed. */
   dismissEvent: (eventId: number) =>
     request<DetectedEvent>(`/api/events/${eventId}/dismiss`, { method: "POST" }),
+  /** Put a Pending Review Detected Event on the calendar (with edits); resolves to it, Confirmed. */
+  confirmEvent: (eventId: number, edits: ConfirmEdits) =>
+    request<DetectedEvent>(`/api/events/${eventId}/confirm`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(edits),
+    }),
   /** Send a Message through Beeper Desktop; resolves to the stored Outbound Message. */
   sendMessage: (chatId: number, text: string) =>
     request<Message>(`/api/chats/${chatId}/messages`, {

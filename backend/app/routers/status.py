@@ -2,9 +2,10 @@ from typing import Annotated
 
 from fastapi import APIRouter, Depends
 
-from app.adapters.protocols import MessageSource
+from app.adapters.protocols import Calendar, MessageSource
 from app.config import Settings
 from app.dependencies import (
+    get_calendar,
     get_first_import,
     get_message_source,
     get_plan_detection,
@@ -12,7 +13,13 @@ from app.dependencies import (
 )
 from app.first_import import FirstImport
 from app.plan_detection import PlanDetection
-from app.schemas import FirstImportOut, MessageSourceStatusOut, PlanDetectionOut, StatusOut
+from app.schemas import (
+    CalendarStatusOut,
+    FirstImportOut,
+    MessageSourceStatusOut,
+    PlanDetectionOut,
+    StatusOut,
+)
 
 router = APIRouter()
 
@@ -23,8 +30,10 @@ async def get_status(
     message_source: Annotated[MessageSource, Depends(get_message_source)],
     first_import: Annotated[FirstImport, Depends(get_first_import)],
     plan_detection: Annotated[PlanDetection, Depends(get_plan_detection)],
+    calendar: Annotated[Calendar, Depends(get_calendar)],
 ) -> StatusOut:
     source_status = await message_source.status()
+    calendar_status = await calendar.status()
     progress = first_import.progress
     detection = plan_detection.status
     return StatusOut(
@@ -40,5 +49,8 @@ async def get_status(
         ),
         plan_detection=PlanDetectionOut(
             enabled=detection.enabled, reason=detection.reason, last_error=detection.last_error
+        ),
+        calendar=CalendarStatusOut(
+            connected=calendar_status.connected, reason=calendar_status.reason
         ),
     )

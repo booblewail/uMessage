@@ -4,6 +4,10 @@
 !.env.example
 token.json
 credentials.json
+# Google Calendar OAuth client and sign-in (live in backend/data/ by default)
+google-credentials.json
+google-token.json
+client_secret*.json
 
 # SQLite database (backend/data/umessage.db by default)
 backend/data/

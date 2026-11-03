@@ -145,6 +145,7 @@ async def test_a_plan_made_over_several_messages_is_one_detected_event_on_the_la
         "location": "Chaco Bar",
         "confidence": 0.9,
         "status": "pending_review",
+        "calendarEntryId": None,
         "updatedAt": event["createdAt"],
     }
     assert await events(running.client) == [event]

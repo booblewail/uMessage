@@ -1,7 +1,7 @@
 """`GET /api/events` lists Detected Events (by start); `POST /api/events/{id}/dismiss` turns a
 Pending Review one Dismissed and pushes the change as `EVENT_DETECTED`."""
 
-from datetime import time, timedelta
+from datetime import time
 from typing import Any
 
 import pytest
@@ -11,23 +11,9 @@ from app.adapters.fakes import FakeMessageSource, FakePlanModel
 from app.config import Settings
 from tests.clock import FakeClock
 from tests.conftest import RunningApp, StartRunningApp
-from tests.plans import days_ahead, new_plan
+from tests.plans import days_ahead, detect, new_plan
 from tests.sources import a_chat, a_message
-from tests.ws import WebSocketSession, inbox_socket
-
-
-async def detect(
-    socket: WebSocketSession,
-    source: FakeMessageSource,
-    clock: FakeClock,
-    settings: Settings,
-    chat: str,
-    text: str,
-) -> dict[str, Any]:
-    source.receive(chat, a_message(f"{chat}-{text}", text=text, ago=timedelta(seconds=1)))
-    await socket.receive_until("NEW_MESSAGE")
-    clock.advance(settings.plan_settle_seconds)
-    return (await socket.receive_until("EVENT_DETECTED"))["event"]
+from tests.ws import inbox_socket
 
 
 @pytest.fixture

@@ -1,24 +1,32 @@
 "use client";
 
 import { useState } from "react";
-import { CalendarCheck, CalendarClock, LoaderCircle, MapPin, X } from "lucide-react";
+import { CalendarCheck, CalendarClock, CalendarPlus, LoaderCircle, MapPin, X } from "lucide-react";
 import { api, toApiError, type DetectedEvent } from "@/lib/api";
 import { formatEventTime } from "@/lib/format";
+import { EventEditDialog } from "@/components/EventEditDialog";
 
 interface Props {
   event: DetectedEvent;
   /** Which side its Anchor Message sits on (an Outbound Message is on the right). */
   outbound: boolean;
-  /** Called with the Detected Event as it is once Dismissed. */
+  /** Called with the Detected Event as it is once Confirmed or Dismissed. */
   onChanged: (event: DetectedEvent) => void;
 }
 
+const LABELS = {
+  pending_review: "Plan spotted",
+  confirming: "Adding to your calendar…",
+  confirmed: "On your calendar",
+} as const;
+
 /**
- * A Detected Event beneath its Anchor Message: what, when and where, and Dismiss while it is
- * Pending Review (Add to Calendar arrives with #9). Dismissed ones aren't shown.
+ * A Detected Event beneath its Anchor Message: what, when and where. While it is Pending
+ * Review, "Add to Calendar" (edit, then Confirm) or Dismiss. Dismissed ones aren't shown.
  */
 export function DetectedEventBanner({ event, outbound, onChanged }: Props) {
   const [dismissing, setDismissing] = useState(false);
+  const [editing, setEditing] = useState(false);
   const [error, setError] = useState<string | null>(null);
   if (event.status === "dismissed") return null;
   const pending = event.status === "pending_review";
@@ -34,6 +42,11 @@ export function DetectedEventBanner({ event, outbound, onChanged }: Props) {
     }
   };
 
+  const confirmed = (updated: DetectedEvent) => {
+    setEditing(false);
+    onChanged(updated);
+  };
+
   const Icon = pending ? CalendarClock : CalendarCheck;
   return (
     <aside
@@ -47,8 +60,11 @@ export function DetectedEventBanner({ event, outbound, onChanged }: Props) {
       <div className="flex items-start gap-2.5">
         <Icon className="mt-0.5 size-4 shrink-0" aria-hidden />
         <div className="min-w-0 flex-1">
-          <p className="text-[11px] font-semibold uppercase tracking-wide opacity-70">
-            {pending ? "Plan spotted" : "On your calendar"}
+          <p
+            className="text-[11px] font-semibold uppercase tracking-wide opacity-70"
+            data-testid="detected-event-state"
+          >
+            {LABELS[event.status]}
           </p>
           <p className="font-semibold" data-testid="detected-event-title">
             {event.title}
@@ -85,7 +101,20 @@ export function DetectedEventBanner({ event, outbound, onChanged }: Props) {
             )}
             Dismiss
           </button>
+          <button
+            type="button"
+            onClick={() => setEditing(true)}
+            disabled={dismissing}
+            data-testid="add-to-calendar"
+            className="inline-flex items-center gap-1 rounded-full bg-indigo-600 px-3 py-1 text-xs font-medium text-white hover:bg-indigo-700 disabled:opacity-60"
+          >
+            <CalendarPlus className="size-3.5" aria-hidden />
+            Add to Calendar
+          </button>
         </div>
+      )}
+      {pending && editing && (
+        <EventEditDialog event={event} onConfirmed={confirmed} onClose={() => setEditing(false)} />
       )}
     </aside>
   );

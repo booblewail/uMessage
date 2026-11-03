@@ -6,7 +6,7 @@ maps its own data onto: the core never sees Beeper's networks, chat types or mes
 
 from collections.abc import Sequence
 from dataclasses import dataclass
-from datetime import datetime
+from datetime import date, datetime
 from enum import StrEnum
 from typing import Protocol
 
@@ -256,8 +256,63 @@ class PlanModel(Protocol):
     async def decide(self, request: PlanRequest) -> PlanDecision: ...
 
 
-class Calendar(Protocol):
-    """Creates Calendar Entries for Confirmed Detected Events (Google Calendar).
+class CalendarUnavailableError(Exception):
+    """The Calendar isn't connected (e.g. nobody has signed in to Google yet): its message
+    says what the user should do."""
 
-    Its operations arrive with the Calendar Entry tickets.
+
+@dataclass(frozen=True, slots=True)
+class CalendarStatus:
+    """Whether Calendar Entries can be created right now, and if not, why (`reason`)."""
+
+    connected: bool
+    reason: str | None
+
+
+@dataclass(frozen=True, slots=True)
+class CalendarEntryRequest:
+    """A Calendar Entry to create.
+
+    Timed: `start` and `end` are aware datetimes, `end` after `start`. All-day: they are
+    dates (no time), the first and the LAST day of the plan, both inclusive (`end == start`
+    for a single day). `timezone` is the user's IANA time zone, which timed entries are shown
+    in. `description` quotes the Chat the plan was made in.
     """
+
+    title: str
+    start: datetime | date
+    end: datetime | date
+    timezone: str
+    location: str | None
+    description: str
+
+    def __post_init__(self) -> None:
+        if self.all_day:
+            if isinstance(self.end, datetime) or self.end < self.start:
+                raise ValueError("an all-day Calendar Entry needs an end date on or after start")
+        elif not (
+            isinstance(self.start, datetime)
+            and isinstance(self.end, datetime)
+            and self.start.tzinfo is not None
+            and self.end.tzinfo is not None
+            and self.end > self.start
+        ):
+            raise ValueError("a timed Calendar Entry needs aware start and end, end after start")
+
+    @property
+    def all_day(self) -> bool:
+        return not isinstance(self.start, datetime)  # a datetime is also a date
+
+
+class Calendar(Protocol):
+    """Creates Calendar Entries for Confirmed Detected Events (Google Calendar)."""
+
+    async def status(self) -> CalendarStatus: ...
+
+    async def create_entry(self, request: CalendarEntryRequest) -> str:
+        """Create the Calendar Entry and return its id (unique across the Calendar).
+
+        Raises `CalendarUnavailableError` while the Calendar isn't connected; anything else
+        it raises means the Calendar Entry wasn't created.
+        """
+        ...

@@ -10,6 +10,8 @@ from pydantic_settings import BaseSettings, NoDecode, SettingsConfigDict
 BACKEND_DIR = Path(__file__).resolve().parents[1]
 REPO_ROOT = BACKEND_DIR.parent
 DEFAULT_DATABASE_URL = f"sqlite+aiosqlite:///{BACKEND_DIR / 'data' / 'umessage.db'}"
+DEFAULT_GOOGLE_CREDENTIALS_PATH = BACKEND_DIR / "data" / "google-credentials.json"
+DEFAULT_GOOGLE_TOKEN_PATH = BACKEND_DIR / "data" / "google-token.json"
 
 
 class DatabaseSettings(BaseSettings):
@@ -22,7 +24,26 @@ class DatabaseSettings(BaseSettings):
     database_url: str = DEFAULT_DATABASE_URL
 
 
-class Settings(DatabaseSettings):
+class GoogleSettings(BaseSettings):
+    """Where the Google Calendar sign-in lives; the sign-in script (`make google-auth`)
+    needs only this part. Relative paths are relative to `backend/`."""
+
+    model_config = SettingsConfigDict(
+        env_file=REPO_ROOT / ".env", env_file_encoding="utf-8", extra="ignore"
+    )
+
+    # The OAuth client ("Desktop app") downloaded from Google Cloud (see the README).
+    google_credentials_path: Path = DEFAULT_GOOGLE_CREDENTIALS_PATH
+    # The user's Google sign-in, written by `make google-auth` and refreshed by the app.
+    google_token_path: Path = DEFAULT_GOOGLE_TOKEN_PATH
+
+    @field_validator("google_credentials_path", "google_token_path")
+    @classmethod
+    def _relative_to_backend(cls, value: Path) -> Path:
+        return value if value.is_absolute() else BACKEND_DIR / value
+
+
+class Settings(DatabaseSettings, GoogleSettings):
     api_token: SecretStr = Field(min_length=16)
     umessage_mode: Literal["real", "demo"] = "real"
     user_timezone: str = "UTC"
@@ -44,6 +65,8 @@ class Settings(DatabaseSettings):
     plan_confidence_threshold: float = Field(default=0.5, ge=0, le=1)
     # At most this many Plan Model calls at a time.
     plan_max_concurrent: int = Field(default=2, ge=1)
+    # How long a confirmed timed plan lasts on the calendar when the Chat gave no end.
+    default_plan_duration_minutes: int = Field(default=60, gt=0)
 
     @field_validator("cors_origins", mode="before")
     @classmethod

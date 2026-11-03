@@ -5,13 +5,14 @@ API_PORT ?= 8000
 FRONTEND_PORT ?= 3000
 INBOX_URL ?= http://127.0.0.1:$(FRONTEND_PORT)/inbox
 
-.PHONY: help dev install migrate test lint open-inbox
+.PHONY: help dev install migrate test lint open-inbox google-auth
 
 help:
 	@echo "make dev      start backend + frontend and open the inbox (UMESSAGE_MODE=demo make dev: fakes)"
 	@echo "make test     run the backend test suite"
 	@echo "make lint     ruff check + format check, frontend type-check, lint and build"
 	@echo "make migrate  apply database migrations"
+	@echo "make google-auth  sign in to Google once, so plans can go on your calendar"
 	@echo "make install  install backend and frontend dependencies"
 
 # First run: create .env from the example with a freshly generated API_TOKEN.
@@ -53,6 +54,10 @@ open-inbox:
 	echo "uMessage inbox: $(INBOX_URL)"; \
 	if [ "$$(uname)" = Darwin ]; then open $(INBOX_URL); \
 	elif command -v xdg-open >/dev/null 2>&1; then xdg-open $(INBOX_URL) >/dev/null 2>&1; fi
+
+# Opens Google's sign-in in the browser; saves the sign-in to GOOGLE_TOKEN_PATH (see README).
+google-auth: backend/.venv
+	cd backend && uv run python -m scripts.google_auth
 
 test: backend/.venv
 	cd backend && uv run pytest

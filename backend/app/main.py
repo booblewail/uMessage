@@ -3,9 +3,9 @@
 `create_app` builds the app from settings plus the three adapters; tests and demo mode
 inject fakes. Startup kicks off one tracked background task that runs First Import (until it
 has completed once) and then live updates for as long as the app runs; plan detection's
-checks run as further tracked tasks, one per Chat waiting to settle. `build_app` is the
-zero-argument factory uvicorn runs (`uvicorn --factory app.main:build_app`, single worker,
-bound to 127.0.0.1).
+checks run as further tracked tasks, one per Chat waiting to settle. Startup also releases
+Detected Events a stopped app left mid-confirm. `build_app` is the zero-argument factory
+uvicorn runs (`uvicorn --factory app.main:build_app`, single worker, bound to 127.0.0.1).
 """
 
 import asyncio
@@ -21,9 +21,11 @@ from app.adapters.beeper_desktop import BeeperDesktopMessageSource
 from app.adapters.demo_fixtures import demo_message_source, demo_plan_decision, demo_trickle
 from app.adapters.fakes import FakeCalendar, FakePlanModel
 from app.adapters.gemini import GeminiPlanModel
+from app.adapters.google_calendar import GoogleCalendar
 from app.adapters.protocols import Calendar, MessageSource, PlanModel
 from app.auth import require_api_token
 from app.background import BackgroundTasks
+from app.calendar_entries import release_unfinished_confirms
 from app.config import Settings
 from app.db import create_engine
 from app.first_import import FirstImport, FirstImportState
@@ -90,6 +92,8 @@ def create_app(
                 await live_updates.run()
 
         try:
+            async with sessionmaker() as session:
+                await release_unfinished_confirms(session)
             import_first = not await first_import.load_completion()
             tasks.start(
                 sync_with_message_source(import_first=import_first), name="message-source-sync"
@@ -130,8 +134,10 @@ def build_app(settings: Settings | None = None) -> FastAPI:
     settings = settings or Settings()  # type: ignore[call-arg]  # API_TOKEN comes from env
     background_jobs: list[BackgroundJob] = []
     plan_model: PlanModel | None
+    calendar: Calendar
     if settings.umessage_mode == "demo":
         plan_model = FakePlanModel(respond=demo_plan_decision)
+        calendar = FakeCalendar()
         demo_source = demo_message_source(running=settings.demo_beeper_running)
         message_source: MessageSource = demo_source
         if settings.demo_new_message_seconds > 0:
@@ -148,11 +154,12 @@ def build_app(settings: Settings | None = None) -> FastAPI:
             if key
             else None
         )
-    # TODO(#9): the Google Calendar adapter replaces this once Calendar has operations.
+        # Without a sign-in yet the app still runs; confirming then says to sign in.
+        calendar = GoogleCalendar(settings.google_token_path)
     return create_app(
         settings,
         message_source=message_source,
         plan_model=plan_model,
-        calendar=FakeCalendar(),
+        calendar=calendar,
         background_jobs=background_jobs,
     )

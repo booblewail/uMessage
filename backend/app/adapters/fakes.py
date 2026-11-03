@@ -3,6 +3,7 @@
 import asyncio
 import dataclasses
 import itertools
+import logging
 import uuid
 from collections import deque
 from collections.abc import Callable, Iterable, Sequence
@@ -11,6 +12,9 @@ from typing import Literal
 
 from app.adapters.protocols import (
     BEEPER_DESKTOP,
+    CalendarEntryRequest,
+    CalendarStatus,
+    CalendarUnavailableError,
     MessageSourceStatus,
     MessageSourceUnavailableError,
     NewMessages,
@@ -25,6 +29,9 @@ from app.adapters.protocols import (
 )
 
 YOU = "You"
+FAKE_CALENDAR_NOT_CONNECTED = "The fake Calendar isn't connected"
+
+logger = logging.getLogger(__name__)
 
 
 class FakeMessageSourceError(RuntimeError):
@@ -200,5 +207,43 @@ class FakePlanModel:
             self.in_flight -= 1
 
 
+class FakeCalendarError(RuntimeError):
+    """What the fake raises while `failing` is set."""
+
+
 class FakeCalendar:
-    """Stands in for Google Calendar."""
+    """Stands in for Google Calendar.
+
+    `entries` records each Calendar Entry created, by id. Steer it through `connected` (False:
+    nobody signed in, so creating raises `CalendarUnavailableError`), `failing` (creating
+    raises `FakeCalendarError`) and `answering` (clear it to hold calls until it is set
+    again); `in_flight` counts calls being answered.
+    """
+
+    def __init__(self, *, connected: bool = True) -> None:
+        self.connected = connected
+        self.failing = False
+        self.entries: dict[str, CalendarEntryRequest] = {}
+        self.answering = asyncio.Event()
+        self.answering.set()
+        self.in_flight = 0
+
+    async def status(self) -> CalendarStatus:
+        if self.connected:
+            return CalendarStatus(connected=True, reason=None)
+        return CalendarStatus(connected=False, reason=FAKE_CALENDAR_NOT_CONNECTED)
+
+    async def create_entry(self, request: CalendarEntryRequest) -> str:
+        self.in_flight += 1
+        try:
+            await self.answering.wait()
+            if not self.connected:
+                raise CalendarUnavailableError(FAKE_CALENDAR_NOT_CONNECTED)
+            if self.failing:
+                raise FakeCalendarError("the fake Calendar is failing")
+            entry_id = f"fake-{uuid.uuid4().hex[:12]}"  # unique across demo restarts too
+            self.entries[entry_id] = request
+            logger.info("Fake Calendar: created Calendar Entry %s %r", entry_id, request.title)
+            return entry_id
+        finally:
+            self.in_flight -= 1

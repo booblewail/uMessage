@@ -125,6 +125,10 @@ class Message(Base):
 
 class DetectedEventStatus(StrEnum):
     PENDING_REVIEW = "pending_review"
+    # Transient: claimed by a confirm that is creating its Calendar Entry right now (#9).
+    # Nothing else changes a Detected Event in this state; it ends Confirmed, or Pending
+    # Review again if the Calendar failed (or the app stopped: see `calendar_entries`).
+    CONFIRMING = "confirming"
     CONFIRMED = "confirmed"
     DISMISSED = "dismissed"
 

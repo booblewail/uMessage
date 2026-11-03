@@ -1,10 +1,18 @@
 """API request/response models: snake_case in Python, camelCase in JSON."""
 
+import re
 from collections.abc import Sequence
-from datetime import datetime
-from typing import Literal
+from datetime import date, datetime
+from typing import Annotated, Literal
 
-from pydantic import BaseModel, ConfigDict, Field, field_validator
+from pydantic import (
+    BaseModel,
+    BeforeValidator,
+    ConfigDict,
+    Field,
+    WithJsonSchema,
+    field_validator,
+)
 from pydantic.alias_generators import to_camel
 
 from app.adapters.protocols import ChatKind, Platform
@@ -42,11 +50,17 @@ class PlanDetectionOut(ApiModel):
     )
 
 
+class CalendarStatusOut(ApiModel):
+    connected: bool = Field(description="Whether Calendar Entries can be created right now")
+    reason: str | None = Field(description="Why not, and what to do (null when connected)")
+
+
 class StatusOut(ApiModel):
     mode: Literal["real", "demo"]
     message_source: MessageSourceStatusOut
     first_import: FirstImportOut
     plan_detection: PlanDetectionOut
+    calendar: CalendarStatusOut
 
 
 class LastMessageOut(ApiModel):
@@ -90,9 +104,74 @@ class DetectedEventOut(ApiModel):
     all_day: bool
     location: str | None
     confidence: float = Field(description="How sure the Plan Model was, 0-1")
-    status: DetectedEventStatus
+    status: DetectedEventStatus = Field(
+        description="`confirming` only while its Calendar Entry is being created"
+    )
+    calendar_entry_id: str | None = Field(description="Its Calendar Entry, once Confirmed")
     created_at: datetime
     updated_at: datetime
+
+
+_DATE_ONLY = re.compile(r"\d{4}-\d{2}-\d{2}")
+
+
+def _date_or_datetime(value: object) -> object:
+    """ "2026-11-06" is a date; anything longer an ISO 8601 date and time."""
+    if not isinstance(value, str):
+        return value
+    try:
+        if _DATE_ONLY.fullmatch(value):
+            return date.fromisoformat(value)
+        return datetime.fromisoformat(value)
+    except ValueError as exc:
+        raise ValueError(f"{value!r} is neither YYYY-MM-DD nor an ISO 8601 date and time") from exc
+
+
+DateOrDateTime = Annotated[
+    datetime | date,
+    BeforeValidator(_date_or_datetime),
+    WithJsonSchema({"type": "string", "description": "YYYY-MM-DD, or ISO 8601 with offset"}),
+]
+
+
+class ConfirmIn(ApiModel):
+    """Edits to make before confirming; whatever is left out stays as detected."""
+
+    model_config = ConfigDict(alias_generator=to_camel, populate_by_name=True, extra="forbid")
+
+    title: str | None = None
+    start: DateOrDateTime | None = Field(
+        default=None,
+        description="Timed: an ISO 8601 date and time with offset. All-day: YYYY-MM-DD, "
+        "its first day. Required when `allDay` changes",
+    )
+    end: DateOrDateTime | None = Field(
+        default=None,
+        description="Like `start`; all-day: its last day (inclusive). null: no end (a timed "
+        "plan gets the default length; an all-day one is a single day)",
+    )
+    all_day: bool | None = None
+    location: str | None = Field(default=None, description="Blank or null: no location")
+
+    @field_validator("title")
+    @classmethod
+    def _has_title(cls, value: str | None) -> str:
+        value = (value or "").strip()
+        if not value:
+            raise ValueError("the title can't be empty")
+        return value
+
+    @field_validator("all_day")
+    @classmethod
+    def _not_null(cls, value: bool | None) -> bool:
+        if value is None:
+            raise ValueError("allDay is true or false")
+        return value
+
+    @field_validator("location")
+    @classmethod
+    def _blank_is_none(cls, value: str | None) -> str | None:
+        return (value or "").strip() or None
 
 
 class DetectedEventsOut(ApiModel):
@@ -153,8 +232,8 @@ class NewMessageEvent(ApiModel):
 
 
 class EventDetectedEvent(ApiModel):
-    """A Detected Event was created, or changed (revised by plan detection, re-anchored, or
-    Dismissed): `event` as the events API now shows it."""
+    """A Detected Event was created, or changed (revised by plan detection, re-anchored,
+    Confirmed or Dismissed): `event` as the events API now shows it."""
 
     type: Literal["EVENT_DETECTED"] = "EVENT_DETECTED"
     change: Literal["created", "updated"]
@@ -173,6 +252,7 @@ def detected_event_out(event: DetectedEvent) -> DetectedEventOut:
         location=event.location,
         confidence=event.confidence,
         status=event.status,
+        calendar_entry_id=event.calendar_entry_id,
         created_at=event.created_at,
         updated_at=event.updated_at,
     )

@@ -12,10 +12,14 @@ from app.models import DetectedEvent, DetectedEventStatus
 
 
 class NotPendingReviewError(Exception):
-    """The Detected Event was already Confirmed or Dismissed."""
+    """The Detected Event was already Confirmed or Dismissed (or is being confirmed)."""
 
     def __init__(self, event: DetectedEvent) -> None:
-        super().__init__(f"Detected Event {event.id} is {event.status.value}, not pending_review")
+        if event.status is DetectedEventStatus.CONFIRMING:
+            message = f"Detected Event {event.id} is being added to the calendar right now"
+        else:
+            message = f"Detected Event {event.id} is {event.status.value}, not pending_review"
+        super().__init__(message)
         self.status = event.status
 
 

@@ -13,6 +13,7 @@ from fastapi import FastAPI
 from httpx import ASGITransport, AsyncClient
 
 from app.adapters.fakes import FakeCalendar, FakeMessageSource, FakePlanModel
+from app.adapters.protocols import Calendar
 from app.config import BACKEND_DIR, Settings
 from app.main import create_app
 from tests.clock import FakeClock
@@ -68,6 +69,12 @@ def plan_model() -> FakePlanModel:
 
 
 @pytest.fixture
+def calendar() -> FakeCalendar:
+    """The Calendar the app under test creates Calendar Entries in; tests read and steer it."""
+    return FakeCalendar()
+
+
+@pytest.fixture
 def clock() -> FakeClock:
     """Plan detection's settle delay only passes when the test calls `clock.advance(...)`."""
     return FakeClock()
@@ -78,12 +85,13 @@ def make_app(
     message_source: FakeMessageSource,
     plan_model: FakePlanModel | None = None,
     clock: FakeClock | None = None,
+    calendar: Calendar | None = None,
 ) -> FastAPI:
     return create_app(
         settings,
         message_source=message_source,
         plan_model=plan_model or FakePlanModel(),
-        calendar=FakeCalendar(),
+        calendar=calendar or FakeCalendar(),
         retry_seconds=RETRY_SECONDS,
         settle_sleep=(clock or FakeClock()).sleep,
     )
@@ -95,8 +103,10 @@ async def app(
     message_source: FakeMessageSource,
     plan_model: FakePlanModel,
     clock: FakeClock,
+    calendar: FakeCalendar,
 ) -> AsyncIterator[FastAPI]:
-    async with LifespanManager(make_app(settings, message_source, plan_model, clock)) as manager:
+    app = make_app(settings, message_source, plan_model, clock, calendar)
+    async with LifespanManager(app) as manager:
         yield manager.app  # type: ignore[misc]
 
 
@@ -154,13 +164,14 @@ async def start_running_app(
     message_source: FakeMessageSource,
     plan_model: FakePlanModel,
     clock: FakeClock,
+    calendar: FakeCalendar,
 ) -> AsyncIterator[StartRunningApp]:
     """Start the app once the test has filled the fake Message Source; it is returned once
     First Import has completed."""
     async with AsyncExitStack() as stack:
 
         async def start() -> RunningApp:
-            app = make_app(settings, message_source, plan_model, clock)
+            app = make_app(settings, message_source, plan_model, clock, calendar)
             manager = await stack.enter_async_context(LifespanManager(app))
             client = await stack.enter_async_context(http_client(manager.app))  # type: ignore[arg-type]
             await wait_for_first_import(client)

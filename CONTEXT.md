@@ -11,8 +11,16 @@ One of the messaging services a Chat lives on: iMessage, Instagram, Messenger, W
 _Avoid_: Network, service, protocol, bridge
 
 **Chat**:
-One conversation, one-to-one or group, on exactly one Platform.
+One conversation, one-to-one or group, on exactly one Platform. Discord server channels are not Chats.
 _Avoid_: Room, conversation, thread, channel
+
+**Excluded Chat**:
+A Chat the user has switched off plan detection for; it still appears in the inbox.
+_Avoid_: Muted chat (muting is a notification setting in Beeper)
+
+**First Import**:
+The one-time load of existing Chats and recent Messages when uMessage first connects to Beeper; its Messages are never checked for plans.
+_Avoid_: Backfill, initial sync
 
 **Message**:
 A single text sent in a Chat, by the user or by someone else.

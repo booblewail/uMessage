@@ -15,6 +15,7 @@ The implementation is tracked phase by phase in `PLAN.md`. Work on one phase at 
 ├── .env.example
 ├── PLAN.md                     # Phased implementation plan / progress state
 ├── docs/
+│   ├── agents/                 # Agent-skill config: issue tracker, triage labels, domain docs
 │   └── matrix-spike.md         # Phase 0 findings: Beeper access, E2EE, platform detection
 ├── backend/
 │   ├── pyproject.toml          # Managed with uv
@@ -73,3 +74,17 @@ cd frontend && npm run type-check && npm run lint && npm run build
 - Never commit `.env`, `token.json`, `credentials.json` or the Matrix crypto store.
 - Use a paid Gemini API tier (or Vertex AI) — chat content is private.
 - Frontend components stay under 200 lines per file.
+
+## Agent skills
+
+### Issue tracker
+
+Issues and specs live in GitHub Issues on `booblewail/uMessage` (`gh` locally, GitHub MCP tools in cloud sessions). See `docs/agents/issue-tracker.md`.
+
+### Triage labels
+
+Default vocabulary: `needs-triage`, `needs-info`, `ready-for-agent`, `ready-for-human`, `wontfix`. See `docs/agents/triage-labels.md`.
+
+### Domain docs
+
+Single-context: one `CONTEXT.md` plus `docs/adr/` at the repo root. See `docs/agents/domain.md`.

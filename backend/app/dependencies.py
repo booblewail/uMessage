@@ -4,6 +4,7 @@ from fastapi import Request
 
 from app.adapters.protocols import Calendar, MessageSource, PlanModel
 from app.config import Settings
+from app.first_import import FirstImport
 
 
 def get_settings(request: Request) -> Settings:
@@ -20,3 +21,7 @@ def get_plan_model(request: Request) -> PlanModel:
 
 def get_calendar(request: Request) -> Calendar:
     return request.app.state.calendar
+
+
+def get_first_import(request: Request) -> FirstImport:
+    return request.app.state.first_import

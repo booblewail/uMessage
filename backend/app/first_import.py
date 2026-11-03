@@ -73,18 +73,25 @@ class FirstImport:
     async def run(self) -> None:
         while True:
             self.progress = FirstImportProgress(state=FirstImportState.WAITING)
-            while not (await self._source.status()).running:
-                await asyncio.sleep(self._retry_seconds)
             try:
+                await self._wait_until_source_is_running()
                 await self._import()
             except MessageSourceUnavailableError:
-                logger.info("Message Source went away during First Import; waiting for it")
+                logger.info("The Message Source went away during First Import; waiting for it")
+                await asyncio.sleep(self._retry_seconds)
                 continue
             except Exception as exc:
                 logger.exception("First Import failed; it runs again on the next start")
                 self.progress.state = FirstImportState.FAILED
                 self.progress.error = str(exc) or type(exc).__name__
             return
+
+    async def _wait_until_source_is_running(self) -> None:
+        # Beeper Desktop's API has no "started" notification, so poll its status.
+        while True:
+            if (await self._source.status()).running:
+                return
+            await asyncio.sleep(self._retry_seconds)
 
     async def _import(self) -> None:
         self.progress.state = FirstImportState.RUNNING

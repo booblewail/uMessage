@@ -10,9 +10,60 @@ export interface MessageSourceStatus {
   running: boolean;
 }
 
+export type FirstImportState = "waiting" | "running" | "completed" | "failed";
+
+export interface FirstImportStatus {
+  state: FirstImportState;
+  /** Known once the Chats have been listed. */
+  chatsTotal: number | null;
+  chatsImported: number;
+  error: string | null;
+}
+
 export interface AppStatus {
   mode: Mode;
   messageSource: MessageSourceStatus;
+  firstImport: FirstImportStatus;
+}
+
+export const PLATFORMS = ["imessage", "instagram", "messenger", "whatsapp", "discord"] as const;
+export type Platform = (typeof PLATFORMS)[number];
+
+export interface LastMessage {
+  senderName: string;
+  text: string;
+  sentAt: string;
+  outbound: boolean;
+}
+
+export interface Chat {
+  id: number;
+  platform: Platform;
+  kind: "one_to_one" | "group";
+  title: string;
+  /** When the last Message was sent (the Chat's last activity if it has none). */
+  lastMessageAt: string;
+  lastMessage: LastMessage | null;
+}
+
+export interface Message {
+  id: number;
+  chatId: number;
+  senderName: string;
+  sentAt: string;
+  text: string;
+  /** True for an Outbound Message: one the user sent, from any client. */
+  outbound: boolean;
+}
+
+/**
+ * The newest `limit` Messages older than `before`, oldest first (display order).
+ * Pass `olderCursor` as `before` to get the page before this one.
+ */
+export interface MessagePage {
+  messages: Message[];
+  hasOlder: boolean;
+  olderCursor: number | null;
 }
 
 export interface Health {
@@ -53,7 +104,25 @@ async function request<T>(path: string, init: RequestInit = {}): Promise<T> {
   return (await response.json()) as T;
 }
 
+function query(params: Record<string, string | number | undefined>): string {
+  const search = new URLSearchParams();
+  for (const [key, value] of Object.entries(params)) {
+    if (value !== undefined) search.set(key, String(value));
+  }
+  const text = search.toString();
+  return text ? `?${text}` : "";
+}
+
+export function toApiError(error: unknown): ApiError {
+  return error instanceof ApiError ? error : new ApiError("http", String(error));
+}
+
 export const api = {
   health: () => request<Health>("/api/health"),
   status: () => request<AppStatus>("/api/status"),
+  /** Chats newest first; `platform` narrows the list to one Platform. */
+  chats: (platform?: Platform) =>
+    request<{ chats: Chat[] }>(`/api/chats${query({ platform })}`),
+  messages: (chatId: number, options: { before?: number; limit?: number } = {}) =>
+    request<MessagePage>(`/api/chats/${chatId}/messages${query(options)}`),
 };

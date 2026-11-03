@@ -1,6 +1,6 @@
 """`GET /api/chats`: every Chat in the inbox, newest first, optionally for one Platform."""
 
-from datetime import UTC, datetime, timedelta
+from datetime import datetime, timedelta
 
 import pytest
 
@@ -70,16 +70,17 @@ async def test_a_chat_without_text_messages_sorts_by_its_last_activity(
         a_chat("a", title="Older", active_ago=timedelta(hours=2)),
         [a_message("a1", ago=timedelta(hours=2))],
     )
-    message_source.add_chat(a_chat("b", title="Photos only", active_ago=timedelta(hours=1)))
+    photos_only = a_chat("b", title="Photos only", active_ago=timedelta(hours=1))
+    message_source.add_chat(photos_only)
     client = await start_app()
 
     chats = (await client.get("/api/chats")).json()["chats"]
 
-    assert [(chat["title"], chat["lastMessage"]) for chat in chats][0] == ("Photos only", None)
-    assert datetime.fromisoformat(chats[0]["lastMessageAt"]) > datetime.now(UTC) - timedelta(
-        hours=1, minutes=1
-    )
-    assert [chat["title"] for chat in chats] == ["Photos only", "Older"]
+    assert [(chat["title"], chat["lastMessage"]) for chat in chats] == [
+        ("Photos only", None),
+        ("Older", chats[1]["lastMessage"]),
+    ]
+    assert datetime.fromisoformat(chats[0]["lastMessageAt"]) == photos_only.last_activity
 
 
 @pytest.mark.parametrize("platform", list(Platform))

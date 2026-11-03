@@ -14,6 +14,8 @@ UMESSAGE_MODE=demo make dev
 
 This installs dependencies, creates `.env` from `.env.example` (with a fresh `API_TOKEN`), applies the database migrations, starts the backend on `http://127.0.0.1:8000` and the frontend on `http://127.0.0.1:3000`, and opens the inbox. Demo mode runs the real app on fake adapters (Message Source, Plan Model, Calendar), so nothing touches Beeper, Gemini or Google. Ctrl-C stops both servers.
 
+On its first start uMessage runs First Import: the last 50 or so Messages of each Chat active in the past 30 days (Discord server channels are left out). In demo mode that brings in fixture Chats on all five Platforms; the progress shows in the inbox and in `GET /api/status`, and it never runs again once it has completed. To start over, delete the database (`backend/data/umessage.db`).
+
 To see the inbox's "Beeper Desktop isn't running" state in demo mode:
 
 ```bash

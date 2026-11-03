@@ -72,7 +72,9 @@ async def save_chat(
     )
 
 
-async def list_chats(session: AsyncSession, *, platform: Platform | None = None) -> list[ChatSummary]:
+async def list_chats(
+    session: AsyncSession, *, platform: Platform | None = None
+) -> list[ChatSummary]:
     """Every stored Chat, newest first by its last Message."""
     ranked = select(
         Message.id,

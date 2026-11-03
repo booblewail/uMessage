@@ -18,6 +18,8 @@ from app.main import create_app
 API_TOKEN = "test-api-token-0123456789"
 # How often First Import re-checks for Beeper Desktop in tests (seconds).
 RETRY_SECONDS = 0.01
+# How long a test waits for First Import to reach a state before failing.
+WAIT_SECONDS = 5.0
 
 
 def migrated_database_url(tmp_path: Path) -> str:
@@ -90,11 +92,9 @@ async def anonymous_client(app: FastAPI) -> AsyncIterator[AsyncClient]:
         yield c
 
 
-async def wait_for_first_import(
-    client: AsyncClient, *, until: str = "completed", timeout: float = 5.0
-) -> dict[str, Any]:
+async def wait_for_first_import(client: AsyncClient, *, until: str = "completed") -> dict[str, Any]:
     """Poll `GET /api/status` until First Import reaches `until`; return its status."""
-    async with asyncio.timeout(timeout):
+    async with asyncio.timeout(WAIT_SECONDS):
         while True:
             first_import = (await client.get("/api/status")).json()["firstImport"]
             if first_import["state"] == until:
@@ -106,7 +106,9 @@ StartApp = Callable[[], Awaitable[AsyncClient]]
 
 
 @pytest.fixture
-async def start_app(settings: Settings, message_source: FakeMessageSource) -> AsyncIterator[StartApp]:
+async def start_app(
+    settings: Settings, message_source: FakeMessageSource
+) -> AsyncIterator[StartApp]:
     """Start the app once the test has filled the fake Message Source; the returned client
     is ready once First Import has completed."""
     async with AsyncExitStack() as stack:

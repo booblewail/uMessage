@@ -43,5 +43,6 @@ def a_message(
 def messages_minutes_apart(prefix: str, count: int) -> list[SourceMessage]:
     """`count` Messages one minute apart; `<prefix>-1` is the oldest, `<prefix>-<count>` newest."""
     return [
-        a_message(f"{prefix}-{n}", ago=timedelta(minutes=count - n + 1)) for n in range(1, count + 1)
+        a_message(f"{prefix}-{n}", ago=timedelta(minutes=count - n + 1))
+        for n in range(1, count + 1)
     ]

@@ -11,10 +11,11 @@ async def test_status_reports_beeper_desktop_running(
     response = await client.get("/api/status")
 
     assert response.status_code == 200
-    assert response.json() == {
-        "mode": "demo",
-        "messageSource": {"name": "Beeper Desktop", "running": True},
-    }
+    body = response.json()
+    assert (body["mode"], body["messageSource"]) == (
+        "demo",
+        {"name": "Beeper Desktop", "running": True},
+    )
 
 
 async def test_status_reports_beeper_desktop_not_running(

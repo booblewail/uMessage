@@ -1,5 +1,8 @@
-from collections.abc import AsyncIterator
+import asyncio
+from collections.abc import AsyncIterator, Awaitable, Callable
+from contextlib import AsyncExitStack
 from pathlib import Path
+from typing import Any
 
 import pytest
 from alembic import command
@@ -13,6 +16,8 @@ from app.config import BACKEND_DIR, Settings
 from app.main import create_app
 
 API_TOKEN = "test-api-token-0123456789"
+# How often First Import re-checks for Beeper Desktop in tests (seconds).
+RETRY_SECONDS = 0.01
 
 
 def migrated_database_url(tmp_path: Path) -> str:
@@ -50,15 +55,19 @@ def message_source() -> FakeMessageSource:
     return FakeMessageSource()
 
 
-@pytest.fixture
-async def app(settings: Settings, message_source: FakeMessageSource) -> AsyncIterator[FastAPI]:
-    application = create_app(
+def make_app(settings: Settings, message_source: FakeMessageSource) -> FastAPI:
+    return create_app(
         settings,
         message_source=message_source,
         plan_model=FakePlanModel(),
         calendar=FakeCalendar(),
+        first_import_retry_seconds=RETRY_SECONDS,
     )
-    async with LifespanManager(application) as manager:
+
+
+@pytest.fixture
+async def app(settings: Settings, message_source: FakeMessageSource) -> AsyncIterator[FastAPI]:
+    async with LifespanManager(make_app(settings, message_source)) as manager:
         yield manager.app  # type: ignore[misc]
 
 
@@ -79,3 +88,34 @@ async def anonymous_client(app: FastAPI) -> AsyncIterator[AsyncClient]:
     """An HTTP client that sends no API token."""
     async with http_client(app, token=None) as c:
         yield c
+
+
+async def wait_for_first_import(
+    client: AsyncClient, *, until: str = "completed", timeout: float = 5.0
+) -> dict[str, Any]:
+    """Poll `GET /api/status` until First Import reaches `until`; return its status."""
+    async with asyncio.timeout(timeout):
+        while True:
+            first_import = (await client.get("/api/status")).json()["firstImport"]
+            if first_import["state"] == until:
+                return first_import
+            await asyncio.sleep(RETRY_SECONDS)
+
+
+StartApp = Callable[[], Awaitable[AsyncClient]]
+
+
+@pytest.fixture
+async def start_app(settings: Settings, message_source: FakeMessageSource) -> AsyncIterator[StartApp]:
+    """Start the app once the test has filled the fake Message Source; the returned client
+    is ready once First Import has completed."""
+    async with AsyncExitStack() as stack:
+
+        async def start() -> AsyncClient:
+            app = make_app(settings, message_source)
+            manager = await stack.enter_async_context(LifespanManager(app))
+            client = await stack.enter_async_context(http_client(manager.app))  # type: ignore[arg-type]
+            await wait_for_first_import(client)
+            return client
+
+        yield start

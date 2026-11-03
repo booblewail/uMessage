@@ -9,7 +9,7 @@ from asgi_lifespan import LifespanManager
 from app.adapters.beeper_desktop import BeeperDesktopMessageSource
 from app.adapters.fakes import FakeCalendar, FakePlanModel
 from app.main import create_app
-from tests.conftest import http_client, make_settings
+from tests.conftest import http_client, make_settings, wait_for_first_import
 
 Handler = Callable[[httpx.Request], httpx.Response]
 
@@ -22,7 +22,7 @@ async def reported_status(database_url: str, source: BeeperDesktopMessageSource)
         calendar=FakeCalendar(),
     )
     async with LifespanManager(app) as manager, http_client(manager.app) as client:
-        return (await client.get("/api/status")).json()
+        return (await client.get("/api/status")).json()["messageSource"]
 
 
 def beeper_answering(handler: Handler) -> BeeperDesktopMessageSource:
@@ -41,7 +41,7 @@ async def test_beeper_desktop_answering_counts_as_running(database_url: str) -> 
     # Beeper Desktop's API rejects requests without its own token; it is still running.
     body = await reported_status(database_url, beeper_answering(lambda _: httpx.Response(401)))
 
-    assert body == {"mode": "real", "messageSource": {"name": "Beeper Desktop", "running": True}}
+    assert body == {"name": "Beeper Desktop", "running": True}
 
 
 async def test_beeper_desktop_timing_out_counts_as_not_running(database_url: str) -> None:
@@ -50,7 +50,7 @@ async def test_beeper_desktop_timing_out_counts_as_not_running(database_url: str
 
     body = await reported_status(database_url, beeper_answering(hang))
 
-    assert body == {"mode": "real", "messageSource": {"name": "Beeper Desktop", "running": False}}
+    assert body == {"name": "Beeper Desktop", "running": False}
 
 
 async def test_nothing_listening_where_beeper_desktop_should_be_counts_as_not_running(
@@ -60,4 +60,22 @@ async def test_nothing_listening_where_beeper_desktop_should_be_counts_as_not_ru
 
     body = await reported_status(database_url, source)
 
-    assert body == {"mode": "real", "messageSource": {"name": "Beeper Desktop", "running": False}}
+    assert body == {"name": "Beeper Desktop", "running": False}
+
+
+async def test_real_mode_starts_and_reports_that_reading_chats_from_beeper_is_not_built_yet(
+    database_url: str,
+) -> None:
+    # TODO(#13): replace with contract tests once the adapter lists Chats and Messages.
+    app = create_app(
+        make_settings(database_url, umessage_mode="real"),
+        message_source=beeper_answering(lambda _: httpx.Response(401)),
+        plan_model=FakePlanModel(),
+        calendar=FakeCalendar(),
+    )
+    async with LifespanManager(app) as manager, http_client(manager.app) as client:
+        first_import = await wait_for_first_import(client, until="failed")
+        chats = (await client.get("/api/chats")).json()
+
+    assert "not built yet" in first_import["error"]
+    assert chats == {"chats": []}

@@ -2,6 +2,7 @@
 
 import asyncio
 import dataclasses
+import hashlib
 import itertools
 import logging
 import uuid
@@ -214,15 +215,19 @@ class FakeCalendarError(RuntimeError):
 class FakeCalendar:
     """Stands in for Google Calendar.
 
-    `entries` records each Calendar Entry created, by id. Steer it through `connected` (False:
+    `entries` records each Calendar Entry created, by id. Like the Google adapter, the id is
+    derived from the request's `entry_key`, and creating one whose key already has an entry
+    returns that entry instead of making a second. Steer it through `connected` (False:
     nobody signed in, so creating raises `CalendarUnavailableError`), `failing` (creating
-    raises `FakeCalendarError`) and `answering` (clear it to hold calls until it is set
-    again); `in_flight` counts calls being answered.
+    raises `FakeCalendarError`), `answering` (clear it to hold calls until it is set again)
+    and `loses_answers` (it creates the entry, then never answers: the app stopped before
+    hearing back); `in_flight` counts calls being answered.
     """
 
     def __init__(self, *, connected: bool = True) -> None:
         self.connected = connected
         self.failing = False
+        self.loses_answers = False
         self.entries: dict[str, CalendarEntryRequest] = {}
         self.answering = asyncio.Event()
         self.answering.set()
@@ -241,9 +246,12 @@ class FakeCalendar:
                 raise CalendarUnavailableError(FAKE_CALENDAR_NOT_CONNECTED)
             if self.failing:
                 raise FakeCalendarError("the fake Calendar is failing")
-            entry_id = f"fake-{uuid.uuid4().hex[:12]}"  # unique across demo restarts too
-            self.entries[entry_id] = request
-            logger.info("Fake Calendar: created Calendar Entry %s %r", entry_id, request.title)
+            entry_id = "fake-" + hashlib.sha256(request.entry_key.encode()).hexdigest()[:16]
+            if entry_id not in self.entries:
+                self.entries[entry_id] = request
+                logger.info("Fake Calendar: created Calendar Entry %s %r", entry_id, request.title)
+            if self.loses_answers:
+                await asyncio.Event().wait()
             return entry_id
         finally:
             self.in_flight -= 1

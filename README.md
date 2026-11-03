@@ -22,6 +22,15 @@ To see the inbox's "Beeper Desktop isn't running" state in demo mode:
 UMESSAGE_MODE=demo DEMO_BEEPER_RUNNING=false make dev
 ```
 
+### Using it
+
+- **Inbox** (`/inbox`): every Chat, newest first, with Platform filters. New Messages arrive live; reply from the box under a Chat; scroll up for older Messages (past what First Import kept, fetched from Beeper). "Plan detection on/off" makes a Chat an Excluded Chat. "Plans" opens a side panel with the open Chat's upcoming plans.
+- **Plans spotted in a Chat** show beneath their Anchor Message: "Add to Calendar" lets you edit the title, time and place, then puts it on your calendar ("On your calendar"); or Dismiss it. If the Chat already has an upcoming Calendar Entry from uMessage, the plan says so ("You already have *Dinner at Mum's, Fri 19:00* from this Chat"), so a changed plan doesn't end up on your calendar twice by accident. uMessage never edits or deletes Calendar Entries.
+- **Plans page** (`/events`, "Plans" in the header, with the number waiting for review): the Pending Review queue (Approve & Sync, or Dismiss) and an agenda of upcoming Confirmed plans by day. Both update live.
+- **Links back**: every plan links to its Anchor Message, `/inbox?chat=<id>&message=<id>`, which opens the Chat scrolled to that Message, highlighted; scroll down for the newer Messages.
+
+In demo mode scripted Messages arrive about every `DEMO_NEW_MESSAGE_SECONDS` and a Chat is checked for plans `PLAN_SETTLE_SECONDS` after it goes quiet; for a quick tour, try `UMESSAGE_MODE=demo DEMO_NEW_MESSAGE_SECONDS=8 PLAN_SETTLE_SECONDS=2 make dev` (Mum invites you to dinner first, then moves it to 7:30).
+
 ### With Beeper Desktop
 
 Open Beeper Desktop with its local API enabled, then run:
@@ -57,7 +66,7 @@ If the token is missing or wrong, the inbox shows Beeper Desktop as not running 
 
 Until you've signed in, everything else works and `GET /api/status` reports `calendar.connected: false`; "Add to Calendar" says to run `make google-auth`. With the consent screen in Testing mode Google expires the sign-in after 7 days, so run `make google-auth` again when uMessage says so (or publish the app to *In production*, unverified, which is fine for your own account). Both JSON files are secrets: they're git-ignored, never commit them.
 
-A plan's Calendar Entry has its title, time (a plan without an end time lasts `DEFAULT_PLAN_DURATION_MINUTES`, an hour by default), location, and a description quoting the Chat it came from. Demo mode uses a fake calendar instead and never touches Google.
+A plan's Calendar Entry has its title, time (a plan without an end time lasts `DEFAULT_PLAN_DURATION_MINUTES`, an hour by default), location, and a description quoting the Chat it came from. Demo mode uses a fake calendar instead and never touches Google. Each Calendar Entry gets an id derived from its plan (and a random id of your uMessage database), so if uMessage stops just as Google creates it, confirming the plan again finds that same Calendar Entry instead of adding a second one.
 
 ## Development
 

@@ -276,7 +276,9 @@ class CalendarEntryRequest:
     Timed: `start` and `end` are aware datetimes, `end` after `start`. All-day: they are
     dates (no time), the first and the LAST day of the plan, both inclusive (`end == start`
     for a single day). `timezone` is the user's IANA time zone, which timed entries are shown
-    in. `description` quotes the Chat the plan was made in.
+    in. `description` quotes the Chat the plan was made in. `entry_key` is stable for the
+    Detected Event (and unique to this uMessage database): the Calendar makes at most one
+    Calendar Entry per key.
     """
 
     title: str
@@ -285,6 +287,7 @@ class CalendarEntryRequest:
     timezone: str
     location: str | None
     description: str
+    entry_key: str
 
     def __post_init__(self) -> None:
         if self.all_day:
@@ -312,7 +315,9 @@ class Calendar(Protocol):
     async def create_entry(self, request: CalendarEntryRequest) -> str:
         """Create the Calendar Entry and return its id (unique across the Calendar).
 
-        Raises `CalendarUnavailableError` while the Calendar isn't connected; anything else
-        it raises means the Calendar Entry wasn't created.
+        Idempotent by `request.entry_key`: if the Calendar Entry for that key already exists
+        (it was created, but the app stopped before storing it), its id is returned and no
+        second one is made. Raises `CalendarUnavailableError` while the Calendar isn't
+        connected; anything else it raises means the Calendar Entry wasn't created.
         """
         ...

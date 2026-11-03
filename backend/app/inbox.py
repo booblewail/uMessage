@@ -52,6 +52,8 @@ class ChatSummary:
 class MessagePage:
     messages: list[Message]  # oldest first
     has_older: bool
+    # Whether the Chat has Messages newer than the page; False once it reaches the present.
+    has_newer: bool = False
 
 
 async def save_chat(
@@ -235,14 +237,8 @@ async def message_page(
     stored too (de-duplicated like any other), so paging carries on through the Chat's whole
     history with no gap or repeat at the boundary, and the cursor stays a stored Message id.
     """
-    chat = await session.get(Chat, chat_id)
-    if chat is None:
-        raise NotFoundError(f"no Chat {chat_id}")
-    cursor: Message | None = None
-    if before is not None:
-        cursor = await session.get(Message, before)
-        if cursor is None or cursor.chat_id != chat_id:
-            raise NotFoundError(f"no Message {before} in Chat {chat_id}")
+    chat = await _chat(session, chat_id)
+    cursor = await _message_in(session, chat_id, before) if before is not None else None
     newest_first = await _stored_page(session, chat_id, cursor, limit)
     history_complete = chat.history_complete
     if len(newest_first) < limit and not history_complete:
@@ -259,7 +255,75 @@ async def message_page(
     return MessagePage(
         messages=newest_first[:limit][::-1],
         has_older=len(newest_first) > limit or not history_complete,
+        has_newer=cursor is not None,
     )
+
+
+async def message_page_after(
+    session: AsyncSession, chat_id: int, *, after: int, limit: int
+) -> MessagePage:
+    """The oldest `limit` Messages of a Chat newer than Message `after`, oldest first: paging
+    back down towards the present (e.g. from a page around an Anchor Message). Newer
+    Messages are always stored, so this never asks the Message Source."""
+    await _chat(session, chat_id)
+    cursor = await _message_in(session, chat_id, after)
+    oldest_first = await _stored_newer(session, chat_id, cursor, limit)
+    return MessagePage(
+        messages=oldest_first[:limit], has_older=True, has_newer=len(oldest_first) > limit
+    )
+
+
+async def message_page_around(
+    session: AsyncSession, chat_id: int, *, around: int, limit: int
+) -> MessagePage:
+    """`limit` stored Messages of a Chat with Message `around` in the middle, oldest first
+    (fewer on one side when that side runs out, more on the other). Paging on with `before`
+    and `after` from either end carries on as usual, past the stored history too."""
+    chat = await _chat(session, chat_id)
+    cursor = await _message_in(session, chat_id, around)
+    older = await _stored_page(session, chat_id, cursor, limit)  # newest first
+    newer = await _stored_newer(session, chat_id, cursor, limit)  # oldest first
+    room = limit - 1
+    older_count = min(len(older), max(room // 2, room - len(newer)))
+    newer_count = min(len(newer), room - older_count)
+    return MessagePage(
+        messages=[*older[:older_count][::-1], cursor, *newer[:newer_count]],
+        has_older=len(older) > older_count or not chat.history_complete,
+        has_newer=len(newer) > newer_count,
+    )
+
+
+async def _chat(session: AsyncSession, chat_id: int) -> Chat:
+    chat = await session.get(Chat, chat_id)
+    if chat is None:
+        raise NotFoundError(f"no Chat {chat_id}")
+    return chat
+
+
+async def _message_in(session: AsyncSession, chat_id: int, message_id: int) -> Message:
+    message = await session.get(Message, message_id)
+    if message is None or message.chat_id != chat_id:
+        raise NotFoundError(f"no Message {message_id} in Chat {chat_id}")
+    return message
+
+
+async def _stored_newer(
+    session: AsyncSession, chat_id: int, cursor: Message, limit: int
+) -> list[Message]:
+    """Up to `limit + 1` stored Messages newer than `cursor`, oldest first."""
+    query = (
+        select(Message)
+        .where(
+            Message.chat_id == chat_id,
+            or_(
+                Message.sent_at > cursor.sent_at,
+                and_(Message.sent_at == cursor.sent_at, Message.id > cursor.id),
+            ),
+        )
+        .order_by(Message.sent_at, Message.id)
+        .limit(limit + 1)
+    )
+    return list((await session.scalars(query)).all())
 
 
 async def _stored_page(

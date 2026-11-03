@@ -188,3 +188,19 @@ class NewMessagesCursor(Base):
     id: Mapped[int] = mapped_column(Integer, primary_key=True, default=1)
     cursor: Mapped[str] = mapped_column(String)
     updated_at: Mapped[datetime] = mapped_column(UtcDateTime)
+
+
+class Installation(Base):
+    """The single row holding this database's random install id, made on first start.
+
+    Calendar Entries are keyed by it plus their Detected Event's id (`calendar_entries`), so
+    that a second uMessage database, whose Detected Events are numbered from 1 again, never
+    picks the same Calendar Entry id.
+    """
+
+    __tablename__ = "installation"
+    __table_args__ = (CheckConstraint("id = 1", name="single_row"),)
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, default=1)
+    install_id: Mapped[str] = mapped_column(String)
+    created_at: Mapped[datetime] = mapped_column(UtcDateTime, default=_now)

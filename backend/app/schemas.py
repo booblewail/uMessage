@@ -18,7 +18,7 @@ from pydantic.alias_generators import to_camel
 from app.adapters.protocols import ChatKind, Platform
 from app.first_import import FirstImportState
 from app.inbox import ChatSummary
-from app.models import DetectedEvent, DetectedEventStatus, Message
+from app.models import Chat, DetectedEvent, DetectedEventStatus, Message
 
 
 class ApiModel(BaseModel):
@@ -92,10 +92,41 @@ class ChatsOut(ApiModel):
     chats: list[ChatOut] = Field(description="Newest first, by `lastMessageAt`")
 
 
+class EventChatOut(ApiModel):
+    """The Chat a Detected Event was found in, as a review card names it."""
+
+    id: int
+    title: str
+    platform: Platform
+
+
+class AnchorMessageOut(ApiModel):
+    """A Detected Event's Anchor Message, as a review card quotes it."""
+
+    id: int
+    sender_name: str
+    text: str
+    sent_at: datetime
+    outbound: bool
+
+
+class CalendarEntryRefOut(ApiModel):
+    """An upcoming Calendar Entry: the Confirmed Detected Event it was made from."""
+
+    id: int = Field(description="The Confirmed Detected Event's id")
+    title: str
+    start: datetime
+    all_day: bool
+
+
 class DetectedEventOut(ApiModel):
     id: int
     chat_id: int
+    chat: EventChatOut
     anchor_message_id: int = Field(description="The Message the inbox shows it beneath")
+    anchor_message: AnchorMessageOut = Field(
+        description="Its Anchor Message; link to it as /inbox?chat=<chatId>&message=<id>"
+    )
     title: str
     start: datetime = Field(description="UTC; an all-day plan starts at local midnight")
     end: datetime | None = Field(
@@ -108,6 +139,11 @@ class DetectedEventOut(ApiModel):
         description="`confirming` only while its Calendar Entry is being created"
     )
     calendar_entry_id: str | None = Field(description="Its Calendar Entry, once Confirmed")
+    existing_calendar_entries: list[CalendarEntryRefOut] = Field(
+        description="The upcoming Calendar Entries its Chat already has (other Confirmed "
+        "Detected Events of the Chat whose start, or all-day last day, isn't past), soonest "
+        "first: 'You already have ... from this Chat'"
+    )
     created_at: datetime
     updated_at: datetime
 
@@ -205,13 +241,20 @@ class ReplyIn(ApiModel):
 
 class MessagePageOut(ApiModel):
     messages: list[MessageOut] = Field(
-        description="The newest `limit` Messages older than `before`, oldest first"
+        description="Oldest first: the newest `limit` older than `before`, the oldest `limit` "
+        "newer than `after`, or `limit` with `around` in the middle"
     )
     has_older: bool = Field(
         description="Whether the Chat has older Messages (stored, or still in Beeper Desktop)"
     )
     older_cursor: int | None = Field(
         description="Pass as `before` to get the page of older Messages; null if none"
+    )
+    has_newer: bool = Field(
+        description="Whether the Chat has newer Messages than these (false: up to the present)"
+    )
+    newer_cursor: int | None = Field(
+        description="Pass as `after` to get the page of newer Messages; null if none"
     )
 
 
@@ -240,11 +283,24 @@ class EventDetectedEvent(ApiModel):
     event: DetectedEventOut
 
 
-def detected_event_out(event: DetectedEvent) -> DetectedEventOut:
+def detected_event_out(
+    event: DetectedEvent,
+    chat: Chat,
+    anchor: Message,
+    existing_calendar_entries: Sequence[DetectedEvent] = (),
+) -> DetectedEventOut:
     return DetectedEventOut(
         id=event.id,
         chat_id=event.chat_id,
+        chat=EventChatOut(id=chat.id, title=chat.title, platform=chat.platform),
         anchor_message_id=event.anchor_message_id,
+        anchor_message=AnchorMessageOut(
+            id=anchor.id,
+            sender_name=anchor.sender_name,
+            text=anchor.text,
+            sent_at=anchor.sent_at,
+            outbound=anchor.outbound,
+        ),
         title=event.title,
         start=event.start_at,
         end=event.end_at,
@@ -253,12 +309,19 @@ def detected_event_out(event: DetectedEvent) -> DetectedEventOut:
         confidence=event.confidence,
         status=event.status,
         calendar_entry_id=event.calendar_entry_id,
+        existing_calendar_entries=[
+            CalendarEntryRefOut(
+                id=other.id, title=other.title, start=other.start_at, all_day=other.all_day
+            )
+            for other in existing_calendar_entries
+            if other.id != event.id
+        ],
         created_at=event.created_at,
         updated_at=event.updated_at,
     )
 
 
-def message_out(message: Message, detected_events: Sequence[DetectedEvent] = ()) -> MessageOut:
+def message_out(message: Message, detected_events: Sequence[DetectedEventOut] = ()) -> MessageOut:
     return MessageOut(
         id=message.id,
         chat_id=message.chat_id,
@@ -266,7 +329,7 @@ def message_out(message: Message, detected_events: Sequence[DetectedEvent] = ())
         sent_at=message.sent_at,
         text=message.text,
         outbound=message.outbound,
-        detected_events=[detected_event_out(event) for event in detected_events],
+        detected_events=list(detected_events),
     )
 
 

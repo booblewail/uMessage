@@ -137,7 +137,11 @@ async def test_a_plan_made_over_several_messages_is_one_detected_event_on_the_la
     assert detected == {"type": "EVENT_DETECTED", "change": "created", "event": event}
     assert {key: value for key, value in event.items() if key not in ("id", "createdAt")} == {
         "chatId": ana,
+        "chat": {"id": ana, "title": "Ana", "platform": "whatsapp"},
         "anchorMessageId": pushed[-1]["id"],
+        "anchorMessage": {
+            key: pushed[-1][key] for key in ("id", "senderName", "text", "sentAt", "outbound")
+        },
         "title": "Dinner at Chaco Bar",
         "start": utc_iso(friday),
         "end": None,
@@ -146,6 +150,7 @@ async def test_a_plan_made_over_several_messages_is_one_detected_event_on_the_la
         "confidence": 0.9,
         "status": "pending_review",
         "calendarEntryId": None,
+        "existingCalendarEntries": [],
         "updatedAt": event["createdAt"],
     }
     assert await events(running.client) == [event]

@@ -1,9 +1,10 @@
 "use client";
 
-import { useState } from "react";
 import { CalendarCheck, CalendarClock, CalendarPlus, LoaderCircle, MapPin, X } from "lucide-react";
-import { api, toApiError, type DetectedEvent } from "@/lib/api";
+import type { DetectedEvent } from "@/lib/api";
 import { formatEventTime } from "@/lib/format";
+import { useEventActions } from "@/lib/useEventActions";
+import { CalendarHint } from "@/components/CalendarHint";
 import { EventEditDialog } from "@/components/EventEditDialog";
 
 interface Props {
@@ -22,30 +23,13 @@ const LABELS = {
 
 /**
  * A Detected Event beneath its Anchor Message: what, when and where. While it is Pending
- * Review, "Add to Calendar" (edit, then Confirm) or Dismiss. Dismissed ones aren't shown.
+ * Review, "Add to Calendar" (edit, then Confirm) or Dismiss, and whether the Chat already has
+ * an upcoming Calendar Entry. Dismissed ones aren't shown.
  */
 export function DetectedEventBanner({ event, outbound, onChanged }: Props) {
-  const [dismissing, setDismissing] = useState(false);
-  const [editing, setEditing] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const { dismissing, editing, setEditing, error, dismiss, confirmed } = useEventActions(event, onChanged);
   if (event.status === "dismissed") return null;
   const pending = event.status === "pending_review";
-
-  const dismiss = async () => {
-    setDismissing(true);
-    setError(null);
-    try {
-      onChanged(await api.dismissEvent(event.id));
-    } catch (failure) {
-      setError(toApiError(failure).message);
-      setDismissing(false);
-    }
-  };
-
-  const confirmed = (updated: DetectedEvent) => {
-    setEditing(false);
-    onChanged(updated);
-  };
 
   const Icon = pending ? CalendarClock : CalendarCheck;
   return (
@@ -80,6 +64,7 @@ export function DetectedEventBanner({ event, outbound, onChanged }: Props) {
           )}
         </div>
       </div>
+      {pending && <CalendarHint entries={event.existingCalendarEntries} />}
       {pending && (
         <div className="flex items-center justify-end gap-2">
           {error && (
@@ -89,7 +74,7 @@ export function DetectedEventBanner({ event, outbound, onChanged }: Props) {
           )}
           <button
             type="button"
-            onClick={() => void dismiss()}
+            onClick={dismiss}
             disabled={dismissing}
             data-testid="dismiss-event"
             className="inline-flex items-center gap-1 rounded-full border border-amber-300 bg-white px-3 py-1 text-xs font-medium text-amber-900 hover:bg-amber-100 disabled:opacity-60"

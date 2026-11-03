@@ -19,26 +19,30 @@ The app is built by an app factory that takes these three adapters, so tests and
 ## Repository Structure
 ```text
 .
-├── Makefile                    # make dev / test / lint
-├── .env.example
+├── Makefile                    # make dev / test / lint / google-auth
+├── .env.example                # every setting, documented
 ├── CONTEXT.md                  # Domain glossary
 ├── PLAN.md                     # Overview + links to the GitHub issues
 ├── docs/
 │   ├── adr/                    # Architecture decision records
-│   ├── agents/                 # Agent-skill config: issue tracker, triage labels, domain docs
-│   └── beeper-spike.md         # Phase 0 findings
-├── backend/
-│   ├── pyproject.toml          # Managed with uv
-│   ├── alembic/                # Migrations
-│   ├── scripts/                # beeper_spike.py, google_auth.py
-│   ├── app/                    # FastAPI app: core services, adapters, routers
-│   └── tests/                  # Pytest suite (HTTP API + WebSocket seam, fake adapters)
-└── frontend/
-    ├── package.json
-    └── src/
-        ├── app/                # /inbox, /events
-        ├── components/         # UI components (<200 lines per file)
-        └── lib/                # api.ts (typed REST client), ws.ts (reconnecting WebSocket hook)
+│   └── agents/                 # Agent-skill config: issue tracker, triage labels, domain docs
+├── backend/                    # FastAPI, managed with uv
+│   ├── alembic/versions/       # Migrations
+│   ├── scripts/                # beeper_spike.py (Phase 0), google_auth.py (make google-auth)
+│   ├── app/
+│   │   ├── main.py             # App factory (create_app / build_app), lifespan, background tasks
+│   │   ├── config.py, models.py, schemas.py   # Settings, SQLAlchemy models, API models (camelCase)
+│   │   ├── first_import.py, live_updates.py, inbox.py, replies.py   # Chats and Messages
+│   │   ├── plan_detection.py, plan_prefilter.py   # Detected Events from new Messages
+│   │   ├── detected_events.py  # Listing/dismissing Detected Events; their API views (+ hint)
+│   │   ├── calendar_entries.py # Confirm -> Calendar Entry, exactly once
+│   │   ├── adapters/           # protocols.py; beeper_desktop, gemini, google_calendar; fakes, demo_fixtures
+│   │   └── routers/            # status, health, chats (+ messages, reply), events, ws
+│   └── tests/                  # Pytest: HTTP API + WebSocket with fake adapters; adapter contracts
+└── frontend/src/               # Next.js (App Router), Tailwind, Lucide
+    ├── app/                    # /inbox (?chat=&message=), /events (review queue + agenda)
+    ├── components/             # UI components (<200 lines per file)
+    └── lib/                    # api.ts (typed REST client), ws.ts (live socket), use* hooks
 ```
 
 ## Commands

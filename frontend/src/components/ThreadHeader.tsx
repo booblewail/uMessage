@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { CalendarOff, CalendarSearch, LoaderCircle, User, Users } from "lucide-react";
+import { CalendarDays, CalendarOff, CalendarSearch, LoaderCircle, User, Users } from "lucide-react";
 import { api, toApiError, type Chat } from "@/lib/api";
 import { PlatformBadge } from "@/components/PlatformBadge";
 
@@ -9,10 +9,17 @@ interface Props {
   chat: Chat;
   /** Called with the Chat as it is once excluded or included again. */
   onChatChanged: (chat: Chat) => void;
+  /** How many upcoming plans the Chat has (null until known). */
+  plansCount: number | null;
+  plansOpen: boolean;
+  onTogglePlans: () => void;
 }
 
-/** The open Chat's title and Platform, and the switch that makes it an Excluded Chat. */
-export function ThreadHeader({ chat, onChatChanged }: Props) {
+/**
+ * The open Chat's title and Platform, the button that shows its upcoming plans, and the
+ * switch that makes it an Excluded Chat.
+ */
+export function ThreadHeader({ chat, onChatChanged, plansCount, plansOpen, onTogglePlans }: Props) {
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const detecting = !chat.excluded;
@@ -33,35 +40,50 @@ export function ThreadHeader({ chat, onChatChanged }: Props) {
   const Icon = saving ? LoaderCircle : detecting ? CalendarSearch : CalendarOff;
   return (
     <header className="flex flex-col gap-1 border-b border-slate-200 px-5 py-3">
-      <div className="flex items-center gap-3">
-        <span className="flex size-9 items-center justify-center rounded-full bg-slate-100 text-slate-500">
+      <div className="flex flex-wrap items-center gap-x-3 gap-y-2">
+        <span className="flex size-9 shrink-0 items-center justify-center rounded-full bg-slate-100 text-slate-500">
           <Avatar className="size-4" aria-hidden />
         </span>
-        <h2 className="min-w-0 flex-1 truncate font-semibold" data-testid="thread-title">
+        <h2 className="min-w-28 flex-1 truncate font-semibold" data-testid="thread-title">
           {chat.title}
         </h2>
-        <button
-          type="button"
-          role="switch"
-          aria-checked={detecting}
-          onClick={() => void toggle()}
-          disabled={saving}
-          data-testid="plan-detection-toggle"
-          title={
-            detecting
-              ? "This Chat is checked for plans. Turn off to make it an Excluded Chat (never sent for plan detection)."
-              : "Excluded Chat: never checked for plans. Turn on to check new Messages again."
-          }
-          className={`inline-flex shrink-0 items-center gap-1.5 rounded-full border px-2.5 py-1 text-xs font-medium disabled:opacity-60 ${
-            detecting
-              ? "border-indigo-200 bg-indigo-50 text-indigo-800 hover:bg-indigo-100"
-              : "border-slate-300 bg-slate-100 text-slate-600 hover:bg-slate-200"
-          }`}
-        >
-          <Icon className={`size-3.5 ${saving ? "animate-spin" : ""}`} aria-hidden />
-          Plan detection {detecting ? "on" : "off"}
-        </button>
-        <PlatformBadge platform={chat.platform} />
+        <div className="ml-auto flex items-center gap-2">
+          <button
+            type="button"
+            onClick={onTogglePlans}
+            aria-pressed={plansOpen}
+            data-testid="toggle-chat-plans"
+            title="This Chat's upcoming plans"
+            className={`inline-flex shrink-0 items-center gap-1.5 rounded-full border px-2.5 py-1 text-xs font-medium ${
+              plansOpen ? "border-slate-800 bg-slate-800 text-white" : "border-slate-300 text-slate-700 hover:bg-slate-100"
+            }`}
+          >
+            <CalendarDays className="size-3.5" aria-hidden />
+            Plans{plansCount ? ` (${plansCount})` : ""}
+          </button>
+          <button
+            type="button"
+            role="switch"
+            aria-checked={detecting}
+            onClick={() => void toggle()}
+            disabled={saving}
+            data-testid="plan-detection-toggle"
+            title={
+              detecting
+                ? "This Chat is checked for plans. Turn off to make it an Excluded Chat (never sent for plan detection)."
+                : "Excluded Chat: never checked for plans. Turn on to check new Messages again."
+            }
+            className={`inline-flex shrink-0 items-center gap-1.5 rounded-full border px-2.5 py-1 text-xs font-medium disabled:opacity-60 ${
+              detecting
+                ? "border-indigo-200 bg-indigo-50 text-indigo-800 hover:bg-indigo-100"
+                : "border-slate-300 bg-slate-100 text-slate-600 hover:bg-slate-200"
+            }`}
+          >
+            <Icon className={`size-3.5 ${saving ? "animate-spin" : ""}`} aria-hidden />
+            Plan detection {detecting ? "on" : "off"}
+          </button>
+          <PlatformBadge platform={chat.platform} />
+        </div>
       </div>
       {error && (
         <p role="alert" className="text-xs text-rose-700">

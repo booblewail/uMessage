@@ -2,17 +2,20 @@
 the saved sign-in. No network: the Google API client is a fake object here."""
 
 import json
+import re
 from datetime import UTC, date, datetime, timedelta
 from pathlib import Path
 from typing import Any
 
+import httplib2
 import pytest
 from asgi_lifespan import LifespanManager
 from google.auth.exceptions import RefreshError
 from google.oauth2.credentials import Credentials
+from googleapiclient.errors import HttpError
 
 from app.adapters.fakes import FakeMessageSource
-from app.adapters.google_calendar import SCOPES, GoogleCalendar, entry_body
+from app.adapters.google_calendar import SCOPES, GoogleCalendar, entry_body, entry_id
 from app.adapters.protocols import CalendarEntryRequest, CalendarUnavailableError
 from app.config import Settings
 from tests.conftest import http_client, make_app
@@ -28,12 +31,14 @@ def timed_request(**changes: Any) -> CalendarEntryRequest:
         "timezone": "Europe/Berlin",
         "location": "Boulderhaus",
         "description": DESCRIPTION,
+        "entry_key": "install-a:42",
     }
     return CalendarEntryRequest(**{**values, **changes})
 
 
 def test_a_timed_entry_is_in_the_users_time_zone() -> None:
     assert entry_body(timed_request()) == {
+        "id": entry_id("install-a:42"),
         "summary": "Climbing",
         "location": "Boulderhaus",
         "description": DESCRIPTION,
@@ -72,18 +77,64 @@ def test_an_inconsistent_request_is_a_bug(changes: dict[str, Any]) -> None:
         timed_request(**changes)
 
 
+# --- The Calendar Entry's own id, so creating it twice can't make two -----------------------
+
+BASE32HEX = re.compile(r"[0-9a-v]{5,1024}")
+
+
+def test_the_entry_id_is_valid_for_google_and_stable() -> None:
+    first = entry_id("install-a:42")
+
+    assert BASE32HEX.fullmatch(first), first
+    assert entry_id("install-a:42") == first
+
+
+@pytest.mark.parametrize("other", ["install-a:43", "install-b:42", "install-a:4", "install-a:420"])
+def test_different_detected_events_get_different_entry_ids(other: str) -> None:
+    assert BASE32HEX.fullmatch(entry_id(other))
+    assert entry_id(other) != entry_id("install-a:42")
+
+
+class FakeRequest:
+    def __init__(self, answer: Any) -> None:
+        self._answer = answer
+
+    def execute(self) -> dict[str, Any]:
+        if isinstance(self._answer, Exception):
+            raise self._answer
+        return self._answer
+
+
+def http_error(status: int) -> HttpError:
+    return HttpError(httplib2.Response({"status": status}), b'{"error": "conflict"}')
+
+
 class FakeEvents:
-    """Stands in for `service.events()`: records each insert and answers with an id."""
+    """Stands in for `service.events()`: stores the inserted events by id, like Google, and
+    answers a second insert with an id already used with HTTP 409."""
 
     def __init__(self) -> None:
         self.inserted: list[tuple[str, dict[str, Any]]] = []
+        self.stored: dict[str, dict[str, Any]] = {}
+        self.updated: list[tuple[str, str, dict[str, Any]]] = []
+        self.insert_fails_with: Exception | None = None
 
-    def insert(self, *, calendarId: str, body: dict[str, Any]) -> "FakeEvents":
+    def insert(self, *, calendarId: str, body: dict[str, Any]) -> FakeRequest:
         self.inserted.append((calendarId, body))
-        return self
+        if self.insert_fails_with is not None:
+            return FakeRequest(self.insert_fails_with)
+        if body["id"] in self.stored:
+            return FakeRequest(http_error(409))
+        self.stored[body["id"]] = {**body, "status": "confirmed"}
+        return FakeRequest(self.stored[body["id"]])
 
-    def execute(self) -> dict[str, Any]:
-        return {"id": f"gcal-{len(self.inserted)}", "status": "confirmed"}
+    def get(self, *, calendarId: str, eventId: str) -> FakeRequest:
+        return FakeRequest(self.stored.get(eventId) or http_error(404))
+
+    def update(self, *, calendarId: str, eventId: str, body: dict[str, Any]) -> FakeRequest:
+        self.updated.append((calendarId, eventId, body))
+        self.stored[eventId] = {**body, "id": eventId}
+        return FakeRequest(self.stored[eventId])
 
 
 class FakeService:
@@ -132,16 +183,56 @@ async def test_entries_are_inserted_into_the_primary_calendar(token_path: Path) 
     calendar = GoogleCalendar(token_path, service_factory=service)
 
     first = await calendar.create_entry(timed_request())
-    second = await calendar.create_entry(timed_request(title="Dinner"))
+    second = await calendar.create_entry(timed_request(title="Dinner", entry_key="install-a:7"))
 
-    assert (first, second) == ("gcal-1", "gcal-2")
+    assert (first, second) == (entry_id("install-a:42"), entry_id("install-a:7"))
     assert service.calendar_events.inserted == [
         ("primary", entry_body(timed_request())),
-        ("primary", entry_body(timed_request(title="Dinner"))),
+        ("primary", entry_body(timed_request(title="Dinner", entry_key="install-a:7"))),
     ]
     assert len(service.credentials) == 1  # one client, reused
     assert service.credentials[0].token == "access-1"
     assert (await calendar.status()).connected
+
+
+async def test_an_entry_that_already_exists_is_taken_as_created(token_path: Path) -> None:
+    """The app stopped after Google created the entry but before it heard back: confirming
+    again inserts the same id, which Google refuses with 409, and that one is the entry."""
+    write_token(token_path, expires_in=timedelta(hours=1))
+    service = FakeService()
+    calendar = GoogleCalendar(token_path, service_factory=service)
+    first = await calendar.create_entry(timed_request())
+
+    again = await calendar.create_entry(timed_request())
+
+    assert again == first == entry_id("install-a:42")
+    assert len(service.calendar_events.inserted) == 2
+    assert list(service.calendar_events.stored) == [first]
+    assert service.calendar_events.updated == []
+
+
+async def test_an_entry_deleted_from_the_calendar_meanwhile_is_put_back(token_path: Path) -> None:
+    write_token(token_path, expires_in=timedelta(hours=1))
+    service = FakeService()
+    calendar = GoogleCalendar(token_path, service_factory=service)
+    first = await calendar.create_entry(timed_request())
+    service.calendar_events.stored[first]["status"] = "cancelled"  # Google keeps deleted ids
+
+    again = await calendar.create_entry(timed_request())
+
+    assert again == first
+    [(calendar_id, event_id, body)] = service.calendar_events.updated
+    assert (calendar_id, event_id) == ("primary", first)
+    assert body == {**entry_body(timed_request()), "status": "confirmed"}
+
+
+async def test_other_insert_errors_are_failures(token_path: Path) -> None:
+    write_token(token_path, expires_in=timedelta(hours=1))
+    service = FakeService()
+    service.calendar_events.insert_fails_with = http_error(500)
+
+    with pytest.raises(HttpError):
+        await GoogleCalendar(token_path, service_factory=service).create_entry(timed_request())
 
 
 async def test_without_a_sign_in_the_calendar_isnt_connected(token_path: Path) -> None:
@@ -185,11 +276,11 @@ async def test_an_expired_sign_in_is_refreshed_and_saved(
     monkeypatch.setattr(Credentials, "refresh", refresh)
     service = FakeService()
 
-    entry_id = await GoogleCalendar(token_path, service_factory=service).create_entry(
+    created = await GoogleCalendar(token_path, service_factory=service).create_entry(
         timed_request()
     )
 
-    assert entry_id == "gcal-1"
+    assert created == entry_id("install-a:42")
     assert service.credentials[0].token == "access-2"
     saved, mode = read_token(token_path)
     assert (saved["token"], saved["refresh_token"]) == ("access-2", "refresh-1")

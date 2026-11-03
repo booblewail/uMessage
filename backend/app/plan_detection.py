@@ -33,6 +33,7 @@ from zoneinfo import ZoneInfo
 from sqlalchemy import select, update
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
+from app import detected_events
 from app.adapters.protocols import (
     NewPlan,
     NoPlan,
@@ -46,7 +47,7 @@ from app.adapters.protocols import (
 from app.background import BackgroundTasks
 from app.models import Chat, DetectedEvent, DetectedEventStatus, Message
 from app.plan_prefilter import looks_like_plan
-from app.schemas import EventDetectedEvent, detected_event_out
+from app.schemas import EventDetectedEvent
 from app.ws_manager import ConnectionManager
 
 logger = logging.getLogger(__name__)
@@ -277,7 +278,8 @@ class PlanDetection:
                 )
                 session.add(event)
                 await session.commit()
-                return EventDetectedEvent(event=detected_event_out(event), change="created")
+                out = await detected_events.view(session, event, timezone=self._timezone)
+                return EventDetectedEvent(event=out, change="created")
             revised = await session.execute(
                 update(DetectedEvent)
                 .where(
@@ -296,4 +298,5 @@ class PlanDetection:
                 return None
             await session.commit()
             event = await session.get_one(DetectedEvent, decision.event_id)
-            return EventDetectedEvent(event=detected_event_out(event), change="updated")
+            out = await detected_events.view(session, event, timezone=self._timezone)
+            return EventDetectedEvent(event=out, change="updated")

@@ -24,6 +24,8 @@ from tests.conftest import (
     http_client,
     make_app,
     make_settings,
+    migrated_database_url,
+    wait_for_first_import,
 )
 from tests.plans import days_ahead, detect, new_plan
 from tests.sources import a_chat, a_message
@@ -402,6 +404,69 @@ async def test_a_confirm_cut_short_is_pending_review_again_after_a_restart(
         assert (await confirm(client, climb)).status_code == 200
 
     assert len(restarted_calendar.entries) == 1
+
+
+async def test_confirming_again_after_a_crash_once_the_calendar_entry_exists_makes_no_second(
+    running: RunningApp,
+    climb: dict[str, Any],
+    calendar: FakeCalendar,
+    settings: Settings,
+    message_source: FakeMessageSource,
+) -> None:
+    """The Calendar created the entry, but the app stopped before hearing back (so before it
+    stored Confirmed): after the restart it is Pending Review again, and confirming it once
+    more finds the same Calendar Entry instead of creating another."""
+    calendar.loses_answers = True
+    confirming = asyncio.create_task(confirm(running.client, climb))
+    await eventually(lambda: _true_when(len(calendar.entries) == 1))
+    confirming.cancel()
+    await asyncio.gather(confirming, return_exceptions=True)
+    [created] = calendar.entries
+
+    calendar.loses_answers = False
+    app = make_app(settings, message_source, calendar=calendar)  # the same (Google's) calendar
+    async with LifespanManager(app) as manager, http_client(manager.app) as client:  # type: ignore[arg-type]
+        assert await event_status(client, climb) == "pending_review"
+        response = await confirm(client, climb, title="Climbing at Boulderhaus")
+
+    assert response.status_code == 200, response.text
+    assert response.json()["calendarEntryId"] == created
+    assert list(calendar.entries) == [created]
+
+
+@pytest.fixture
+def other_database_url(tmp_path: Path) -> str:
+    """A second uMessage database (migrated outside the event loop, like `database_url`)."""
+    (tmp_path / "other").mkdir()
+    return migrated_database_url(tmp_path / "other")
+
+
+async def test_calendar_entry_keys_differ_between_databases(
+    running: RunningApp,
+    climb: dict[str, Any],
+    calendar: FakeCalendar,
+    other_database_url: str,
+    message_source: FakeMessageSource,
+) -> None:
+    """Another uMessage database (e.g. after starting over) numbers its Detected Events from 1
+    again; its Calendar Entries must not be mistaken for this one's."""
+    await confirm(running.client, climb)
+    other_settings = make_settings(other_database_url, user_timezone="Europe/Berlin")
+    plan_model, clock = FakePlanModel(), FakeClock()
+    plan_model.will_decide(new_plan("Climbing", start=days_ahead(4, time(19))))
+    app = make_app(other_settings, message_source, plan_model, clock, calendar)
+    async with LifespanManager(app) as manager, http_client(manager.app) as client:  # type: ignore[arg-type]
+        await wait_for_first_import(client)
+        async with inbox_socket(manager.app) as socket:  # type: ignore[arg-type]
+            other = await detect(
+                socket, message_source, clock, other_settings, "crew", "Or Friday 7pm?"
+            )
+        assert other["id"] == climb["id"]
+        response = await confirm(client, other)
+
+    assert response.status_code == 200, response.text
+    first, second = (request.entry_key for request in calendar.entries.values())
+    assert first != second
 
 
 # --- When it can't be confirmed -------------------------------------------------------------

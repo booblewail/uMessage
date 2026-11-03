@@ -41,3 +41,26 @@ export function formatEventTime(start: string, end: string | null, allDay: boole
     ? `${text}–${to.toLocaleTimeString(undefined, TIME)}`
     : `${text} – ${to.toLocaleDateString(undefined, EVENT_DAY)}, ${to.toLocaleTimeString(undefined, TIME)}`;
 }
+
+/** When a Calendar Entry is, briefly: "Fri 19:30" this coming week, "Fri 13 Nov, 19:30" later. */
+export function formatEntryWhen(start: string, allDay: boolean, now: Date = new Date()): string {
+  const date = new Date(start);
+  const inAWeek = new Date(now);
+  inAWeek.setDate(now.getDate() + 6);
+  inAWeek.setHours(23, 59, 59, 999);
+  const day = date.toLocaleDateString(
+    undefined,
+    date <= inAWeek ? { weekday: "short" } : { weekday: "short", day: "numeric", month: "short" },
+  );
+  return allDay ? day : `${day} ${date.toLocaleTimeString(undefined, TIME)}`;
+}
+
+/** An agenda day heading: "Today", "Tomorrow", or "Saturday 7 November". */
+export function formatAgendaDay(iso: string, now: Date = new Date()): string {
+  const date = new Date(iso);
+  if (isSameDay(date, now)) return "Today";
+  const tomorrow = new Date(now);
+  tomorrow.setDate(now.getDate() + 1);
+  if (isSameDay(date, tomorrow)) return "Tomorrow";
+  return date.toLocaleDateString(undefined, { weekday: "long", day: "numeric", month: "long" });
+}

@@ -6,12 +6,14 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app import detected_events, inbox, replies
 from app.adapters.protocols import MessageSource, Platform
+from app.config import Settings
 from app.db import get_session
 from app.dependencies import (
     get_connections,
     get_inbox_lock,
     get_message_source,
     get_plan_detection,
+    get_settings,
 )
 from app.models import Chat
 from app.plan_detection import PlanDetection
@@ -64,17 +66,35 @@ async def list_messages(
     chat_id: int,
     session: Session,
     message_source: Annotated[MessageSource, Depends(get_message_source)],
+    settings: Annotated[Settings, Depends(get_settings)],
     before: Annotated[int | None, Query(description="A Message id: only older ones")] = None,
+    after: Annotated[int | None, Query(description="A Message id: only newer ones")] = None,
+    around: Annotated[
+        int | None, Query(description="A Message id (an Anchor Message): a page centred on it")
+    ] = None,
     limit: Annotated[int, Query(ge=1, le=200)] = 50,
 ) -> MessagePageOut:
-    """A page of a Chat's Messages: the newest `limit` before `before`, oldest first.
+    """A page of a Chat's Messages, oldest first: the newest `limit` (before `before`), the
+    oldest `limit` after `after`, or `limit` with `around` in the middle. At most one of the
+    three; 404 if it isn't a Message of this Chat.
 
     Paging back goes past the stored Messages to older ones from Beeper Desktop; 503 if
     those are needed while Beeper Desktop can't give them."""
-    try:
-        page = await inbox.message_page(
-            session, message_source, chat_id, before=before, limit=limit
+    cursors = {"before": before, "after": after, "around": around}
+    given = [name for name, value in cursors.items() if value is not None]
+    if len(given) > 1:
+        raise HTTPException(
+            status.HTTP_422_UNPROCESSABLE_CONTENT, f"give only one of {', '.join(given)}"
         )
+    try:
+        if around is not None:
+            page = await inbox.message_page_around(session, chat_id, around=around, limit=limit)
+        elif after is not None:
+            page = await inbox.message_page_after(session, chat_id, after=after, limit=limit)
+        else:
+            page = await inbox.message_page(
+                session, message_source, chat_id, before=before, limit=limit
+            )
     except inbox.NotFoundError as exc:
         raise HTTPException(status.HTTP_404_NOT_FOUND, str(exc)) from exc
     except inbox.OlderMessagesUnavailableError as exc:
@@ -82,11 +102,23 @@ async def list_messages(
             status.HTTP_503_SERVICE_UNAVAILABLE,
             f"Older Messages can't be loaded from Beeper Desktop right now: {exc}",
         ) from exc
-    anchored = await detected_events.anchored_on(session, [m.id for m in page.messages])
+    messages = page.messages
+    anchored = await detected_events.anchored_on(session, [m.id for m in messages])
+    views = await detected_events.views(
+        session,
+        [event for events in anchored.values() for event in events],
+        timezone=settings.user_timezone,
+    )
+    cursor = after if after is not None else before
     return MessagePageOut(
-        messages=[message_out(message, anchored.get(message.id, ())) for message in page.messages],
+        messages=[
+            message_out(message, [views[event.id] for event in anchored.get(message.id, ())])
+            for message in messages
+        ],
         has_older=page.has_older,
-        older_cursor=page.messages[0].id if page.has_older else None,
+        older_cursor=(messages[0].id if messages else cursor) if page.has_older else None,
+        has_newer=page.has_newer,
+        newer_cursor=(messages[-1].id if messages else cursor) if page.has_newer else None,
     )
 
 

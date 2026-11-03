@@ -1,12 +1,16 @@
 "use client";
 
 import { useState } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
 import { Inbox, MessageSquareDashed } from "lucide-react";
 import type { Chat, Platform } from "@/lib/api";
+import { PENDING_REVIEW } from "@/lib/events";
 import { PLATFORM_LOOKS } from "@/lib/platforms";
 import { useAppStatus } from "@/lib/useAppStatus";
 import { useChats } from "@/lib/useChats";
+import { useEvents } from "@/lib/useEvents";
 import { useInboxSocket } from "@/lib/ws";
+import { AppNav } from "@/components/AppNav";
 import { ChatList } from "@/components/ChatList";
 import { DemoModeBadge } from "@/components/DemoModeBadge";
 import { FirstImportNotice } from "@/components/FirstImportNotice";
@@ -16,20 +20,42 @@ import { MessageThread } from "@/components/MessageThread";
 import { PlanDetectionNotice } from "@/components/PlanDetectionNotice";
 import { PlatformFilter } from "@/components/PlatformFilter";
 
+/** A positive integer from the URL, or null. */
+function idParam(value: string | null): number | null {
+  const id = Number(value);
+  return Number.isInteger(id) && id > 0 ? id : null;
+}
+
+/**
+ * The inbox. The open Chat is in the URL (`/inbox?chat=<id>`); `&message=<id>` opens it at
+ * that Message, highlighted (how links to an Anchor Message land).
+ */
 export function InboxView() {
   const state = useAppStatus();
   const socket = useInboxSocket();
   const status = state.kind === "loaded" ? state.status : null;
   const firstImport = status?.firstImport ?? null;
+  const router = useRouter();
+  const params = useSearchParams();
+  const chatId = idParam(params.get("chat"));
+  const messageId = idParam(params.get("message"));
 
   const [platform, setPlatform] = useState<Platform | null>(null);
-  const [selected, setSelected] = useState<Chat | null>(null);
   // Reload the list as First Import adds Chats, and after the live socket reconnects.
   const importKey = firstImport ? `${firstImport.state}:${firstImport.chatsImported}` : "";
   const { state: chats, updateChat } = useChats(platform, `${importKey}:${socket.reconnects}`, socket.subscribe);
+  const pending = useEvents(PENDING_REVIEW, socket.subscribe, socket.reconnects);
+  // The Chat picked last stays open while a Platform filter hides it from the list.
+  const [picked, setPicked] = useState<Chat | null>(null);
+  const listed = chats.kind === "loaded" ? chats.chats.find((chat) => chat.id === chatId) : undefined;
+  const selected = listed ?? (picked && picked.id === chatId ? picked : null);
+  const select = (chat: Chat) => {
+    setPicked(chat);
+    router.push(`/inbox?chat=${chat.id}`);
+  };
   const onChatChanged = (chat: Chat) => {
     updateChat(chat);
-    setSelected(chat);
+    setPicked(chat);
   };
 
   const emptyText =
@@ -46,7 +72,8 @@ export function InboxView() {
           <Inbox className="size-6 text-indigo-600" aria-hidden />
           Inbox
         </h1>
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-3">
+          <AppNav pendingCount={pending.state.kind === "loaded" ? pending.state.events.length : null} />
           <LiveIndicator live={socket.live} />
           {status?.mode === "demo" && <DemoModeBadge />}
         </div>
@@ -65,7 +92,7 @@ export function InboxView() {
             <ChatList
               state={chats}
               selectedId={selected?.id ?? null}
-              onSelect={setSelected}
+              onSelect={select}
               emptyText={emptyText}
             />
           </div>
@@ -74,8 +101,9 @@ export function InboxView() {
         <main className="flex min-h-0 flex-col overflow-hidden rounded-xl border border-slate-200 bg-white">
           {selected ? (
             <MessageThread
-              key={selected.id}
+              key={`${selected.id}:${messageId ?? ""}`}
               chat={selected}
+              highlightId={messageId}
               subscribe={socket.subscribe}
               reconnects={socket.reconnects}
               onChatChanged={onChatChanged}

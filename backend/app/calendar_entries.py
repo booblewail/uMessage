@@ -6,17 +6,23 @@ only one gets that far; the other is a conflict. Once the Calendar Entry exists 
 Confirmed; if the Calendar fails it is Pending Review again. A confirm cut short (the app
 stopped mid-call) is released when the app next starts (`release_unfinished_confirms`).
 
+The Calendar is asked with an `entry_key` (this database's install id plus the Detected
+Event's id), which it makes at most one Calendar Entry for: if the app stopped after the
+Calendar created the entry but before it was stored, confirming again finds that same entry.
+
 The user may edit the plan while confirming (`Edits`); the Detected Event takes on what was
 put on the calendar, including the default length given to a timed plan without an end.
 """
 
 import logging
+import secrets
 from dataclasses import dataclass
 from datetime import UTC, date, datetime, time, timedelta
 from enum import Enum, auto
 from zoneinfo import ZoneInfo
 
 from sqlalchemy import and_, or_, select, update
+from sqlalchemy.dialects.sqlite import insert
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.adapters.protocols import (
@@ -27,7 +33,7 @@ from app.adapters.protocols import (
 )
 from app.detected_events import NotPendingReviewError
 from app.inbox import NotFoundError
-from app.models import Chat, DetectedEvent, DetectedEventStatus, Message
+from app.models import Chat, DetectedEvent, DetectedEventStatus, Installation, Message
 
 logger = logging.getLogger(__name__)
 
@@ -98,10 +104,12 @@ async def confirm(
     event_id: int,
     edits: Edits,
     *,
+    install_id: str,
     timezone: str,
     default_duration: timedelta,
 ) -> DetectedEvent:
-    """Create the Detected Event's Calendar Entry and make it Confirmed.
+    """Create the Detected Event's Calendar Entry and make it Confirmed. `install_id` is this
+    database's (`load_install_id`).
 
     Raises NotFoundError, NotPendingReviewError (it is Confirmed, Dismissed or being
     confirmed), InvalidEditsError, CalendarUnavailableError or CalendarEntryFailedError (it
@@ -130,6 +138,7 @@ async def confirm(
             timezone=timezone,
             location=plan.location,
             description=await _quote_chat(session, event),
+            entry_key=f"{install_id}:{event.id}",
         )
         try:
             entry_id = await calendar.create_entry(request)
@@ -157,6 +166,17 @@ async def confirm(
     )
     await session.commit()
     return await session.get_one(DetectedEvent, event_id, populate_existing=True)
+
+
+async def load_install_id(session: AsyncSession) -> str:
+    """This database's random install id, made the first time it is asked for."""
+    await session.execute(
+        insert(Installation)
+        .values(id=1, install_id=secrets.token_hex(8), created_at=datetime.now(UTC))
+        .on_conflict_do_nothing(index_elements=[Installation.id])
+    )
+    await session.commit()
+    return (await session.get_one(Installation, 1)).install_id
 
 
 async def release_unfinished_confirms(session: AsyncSession) -> int:

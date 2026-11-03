@@ -25,7 +25,7 @@ from app.adapters.google_calendar import GoogleCalendar
 from app.adapters.protocols import Calendar, MessageSource, PlanModel
 from app.auth import require_api_token
 from app.background import BackgroundTasks
-from app.calendar_entries import release_unfinished_confirms
+from app.calendar_entries import load_install_id, release_unfinished_confirms
 from app.config import Settings
 from app.db import create_engine
 from app.first_import import FirstImport, FirstImportState
@@ -94,6 +94,7 @@ def create_app(
         try:
             async with sessionmaker() as session:
                 await release_unfinished_confirms(session)
+                app.state.install_id = await load_install_id(session)
             import_first = not await first_import.load_completion()
             tasks.start(
                 sync_with_message_source(import_first=import_first), name="message-source-sync"

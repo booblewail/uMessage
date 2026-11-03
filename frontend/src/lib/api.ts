@@ -69,11 +69,37 @@ export interface Chat {
 /** `confirming` only while its Calendar Entry is being created. */
 export type DetectedEventStatus = "pending_review" | "confirming" | "confirmed" | "dismissed";
 
+/** The Chat a Detected Event was found in. */
+export interface EventChat {
+  id: number;
+  title: string;
+  platform: Platform;
+}
+
+/** A Detected Event's Anchor Message: the latest Message that shaped it. */
+export interface AnchorMessage {
+  id: number;
+  senderName: string;
+  text: string;
+  sentAt: string;
+  outbound: boolean;
+}
+
+/** An upcoming Calendar Entry, by the Confirmed Detected Event it was made from. */
+export interface CalendarEntryRef {
+  id: number;
+  title: string;
+  start: string;
+  allDay: boolean;
+}
+
 /** A plan found in a Chat, shown beneath its Anchor Message. */
 export interface DetectedEvent {
   id: number;
   chatId: number;
+  chat: EventChat;
   anchorMessageId: number;
+  anchorMessage: AnchorMessage;
   title: string;
   /** UTC; an all-day plan starts at local midnight of its date. */
   start: string;
@@ -85,6 +111,8 @@ export interface DetectedEvent {
   status: DetectedEventStatus;
   /** Its Calendar Entry, once Confirmed. */
   calendarEntryId: string | null;
+  /** Upcoming Calendar Entries its Chat already has (other Confirmed ones), soonest first. */
+  existingCalendarEntries: CalendarEntryRef[];
   createdAt: string;
   updatedAt: string;
 }
@@ -115,13 +143,25 @@ export interface Message {
 }
 
 /**
- * The newest `limit` Messages older than `before`, oldest first (display order).
- * Pass `olderCursor` as `before` to get the page before this one.
+ * A page of Messages, oldest first (display order): the newest `limit` older than `before`,
+ * the oldest `limit` newer than `after`, or `limit` centred on `around`. Pass `olderCursor`
+ * as `before` for the page before this one, `newerCursor` as `after` for the one after.
  */
 export interface MessagePage {
   messages: Message[];
   hasOlder: boolean;
   olderCursor: number | null;
+  /** False once the page reaches the newest Message. */
+  hasNewer: boolean;
+  newerCursor: number | null;
+}
+
+export interface EventFilter {
+  /** Only these statuses (any when left out). */
+  status?: DetectedEventStatus[];
+  chatId?: number;
+  /** Only those starting at or after this ISO 8601 time. */
+  from?: string;
 }
 
 export interface Health {
@@ -175,10 +215,10 @@ async function errorDetail(response: Response): Promise<string | null> {
   return null;
 }
 
-function query(params: Record<string, string | number | undefined>): string {
+function query(params: Record<string, string | number | string[] | undefined>): string {
   const search = new URLSearchParams();
   for (const [key, value] of Object.entries(params)) {
-    if (value !== undefined) search.set(key, String(value));
+    if (value !== undefined) search.set(key, Array.isArray(value) ? value.join(",") : String(value));
   }
   const text = search.toString();
   return text ? `?${text}` : "";
@@ -194,7 +234,8 @@ export const api = {
   /** Chats newest first; `platform` narrows the list to one Platform. */
   chats: (platform?: Platform) =>
     request<{ chats: Chat[] }>(`/api/chats${query({ platform })}`),
-  messages: (chatId: number, options: { before?: number; limit?: number } = {}) =>
+  /** At most one of `before`, `after` and `around` (a Message id). */
+  messages: (chatId: number, options: { before?: number; after?: number; around?: number; limit?: number } = {}) =>
     request<MessagePage>(`/api/chats/${chatId}/messages${query(options)}`),
   /** Make a Chat an Excluded Chat (never checked for plans), or include it again. */
   setChatExcluded: (chatId: number, excluded: boolean) =>
@@ -203,9 +244,9 @@ export const api = {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ excluded }),
     }),
-  /** Detected Events, soonest first. */
-  events: (options: { status?: DetectedEventStatus; chatId?: number } = {}) =>
-    request<{ events: DetectedEvent[] }>(`/api/events${query(options)}`),
+  /** Detected Events, soonest first, each with its Chat and Anchor Message. */
+  events: (filter: EventFilter = {}) =>
+    request<{ events: DetectedEvent[] }>(`/api/events${query({ ...filter })}`),
   /** Dismiss a Pending Review Detected Event; resolves to it, now Dismissed. */
   dismissEvent: (eventId: number) =>
     request<DetectedEvent>(`/api/events/${eventId}/dismiss`, { method: "POST" }),

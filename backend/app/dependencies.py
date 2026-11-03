@@ -41,3 +41,8 @@ def get_inbox_lock(request: Request) -> asyncio.Lock:
 
 def get_plan_detection(request: Request) -> PlanDetection:
     return request.app.state.plan_detection
+
+
+def get_install_id(request: Request) -> str:
+    """This database's install id, which Calendar Entries are keyed by."""
+    return request.app.state.install_id

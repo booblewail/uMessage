@@ -5,6 +5,8 @@ import { DetectedEventBanner } from "@/components/DetectedEventBanner";
 
 interface Props {
   message: Message;
+  /** Marks the Message a link jumped to (an Anchor Message). */
+  highlighted?: boolean;
   /** Called with a Detected Event beneath it once it changed (e.g. was Dismissed). */
   onEventChanged: (event: DetectedEvent) => void;
 }
@@ -13,13 +15,17 @@ interface Props {
  * One Message; the user's own (an Outbound Message) sits on the right, marked "You". The
  * Detected Events it is the Anchor Message of show beneath it.
  */
-export function MessageBubble({ message, onEventChanged }: Props) {
+export function MessageBubble({ message, highlighted = false, onEventChanged }: Props) {
   const { outbound } = message;
   return (
     <li
       data-testid="message"
+      data-message-id={message.id}
       data-outbound={outbound}
-      className={`flex flex-col gap-1 ${outbound ? "items-end" : "items-start"}`}
+      data-highlighted={highlighted}
+      className={`flex flex-col gap-1 ${outbound ? "items-end" : "items-start"} ${
+        highlighted ? "-mx-2 rounded-xl bg-amber-100/70 px-2 py-1.5 ring-2 ring-amber-300" : ""
+      }`}
     >
       <span className="flex items-center gap-1.5 px-1 text-xs text-slate-500">
         {outbound ? (

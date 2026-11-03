@@ -1,0 +1,51 @@
+{
+  "name": "confirming_pending_is_nothing",
+  "description": "The day before, the pending dinner is only confirmed, unchanged: nothing.",
+  "timezone": "Australia/Sydney",
+  "now": "2026-11-05T17:15:00+11:00",
+  "messages": [
+    {
+      "sender_name": "Ana",
+      "text": "Dinner Friday?",
+      "sent_at": "2026-11-03T13:50:00+11:00",
+      "outbound": false
+    },
+    {
+      "sender_name": "You",
+      "text": "Keen",
+      "sent_at": "2026-11-03T13:52:00+11:00",
+      "outbound": true
+    },
+    {
+      "sender_name": "Ana",
+      "text": "7:30pm at Chaco Bar",
+      "sent_at": "2026-11-03T13:55:00+11:00",
+      "outbound": false
+    },
+    {
+      "sender_name": "Ana",
+      "text": "Still on for tomorrow at 7:30?",
+      "sent_at": "2026-11-05T17:00:00+11:00",
+      "outbound": false
+    },
+    {
+      "sender_name": "You",
+      "text": "Yep, see you at Chaco!",
+      "sent_at": "2026-11-05T17:04:00+11:00",
+      "outbound": true
+    }
+  ],
+  "pending": [
+    {
+      "id": 11,
+      "title": "Dinner with Ana at Chaco Bar",
+      "start": "2026-11-06T19:30:00+11:00",
+      "end": null,
+      "all_day": false,
+      "location": "Chaco Bar"
+    }
+  ],
+  "expected": {
+    "kind": "nothing"
+  }
+}

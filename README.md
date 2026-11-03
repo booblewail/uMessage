@@ -68,6 +68,22 @@ Until you've signed in, everything else works and `GET /api/status` reports `cal
 
 A plan's Calendar Entry has its title, time (a plan without an end time lasts `DEFAULT_PLAN_DURATION_MINUTES`, an hour by default), location, and a description quoting the Chat it came from. Demo mode uses a fake calendar instead and never touches Google. Each Calendar Entry gets an id derived from its plan (and a random id of your uMessage database), so if uMessage stops just as Google creates it, confirming the plan again finds that same Calendar Entry instead of adding a second one.
 
+### Checking plan detection accuracy
+
+Before trusting plan detection with your real Chats, check how well your Gemini model does on a set of made-up Chats with known answers (`backend/tests/fixtures/plan_eval/`: multi-Message plans, revisions of a pending plan, relative dates like "Friday" said on a Sunday or "tomorrow" said yesterday, all-day plans and trips, and things that are not plans: deadlines, other people's appointments, vague intentions, small talk with times, cancelled plans).
+
+1. Put your paid-tier key in `.env` as `GEMINI_API_KEY=...` (and `GEMINI_MODEL` if you want a model other than the default).
+2. Run:
+
+   ```bash
+   make eval-plans
+   ```
+
+   It asks Gemini about each Chat (about one API call per case), prints a PASS/FAIL table and the overall score, and writes the details, including the model's reason for each decision, to `backend/data/plan-eval-report.md`. A case passes when the decision is right (nothing / new / update of the right plan) and so are its start date and time, all-day flag and, where the case names one, end date and place. Plans less sure than `PLAN_CONFIDENCE_THRESHOLD` count as nothing, as in the app. The run fails if fewer than 80% of cases pass (`PLAN_EVAL_MIN_SCORE=0.9 make eval-plans` to change that).
+3. Share `backend/data/plan-eval-report.md` (it contains only the made-up Chats, never your own).
+
+Without a key the check is skipped; `make test` never calls Gemini.
+
 ## Development
 
 ```bash

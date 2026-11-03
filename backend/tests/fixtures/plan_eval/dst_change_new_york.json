@@ -1,0 +1,28 @@
+{
+  "name": "dst_change_new_york",
+  "description": "New York: the Message is sent in daylight time (-04:00) but the plan is after clocks go back on Sunday 1 November (-05:00); 11am must stay 11am local.",
+  "timezone": "America/New_York",
+  "now": "2026-10-30T18:30:00-04:00",
+  "messages": [
+    {
+      "sender_name": "Dana",
+      "text": "Brunch Sunday at 11? Russ & Daughters",
+      "sent_at": "2026-10-30T18:00:00-04:00",
+      "outbound": false
+    },
+    {
+      "sender_name": "You",
+      "text": "Yes! I'll get there early for a table",
+      "sent_at": "2026-10-30T18:20:00-04:00",
+      "outbound": true
+    }
+  ],
+  "pending": [],
+  "expected": {
+    "kind": "new",
+    "start_date": "2026-11-01",
+    "start_time": "11:00",
+    "all_day": false,
+    "location_contains": "Russ"
+  }
+}

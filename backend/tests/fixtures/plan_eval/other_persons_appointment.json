@@ -1,0 +1,24 @@
+{
+  "name": "other_persons_appointment",
+  "description": "Someone else's appointment with a time, which the user isn't going to.",
+  "timezone": "Australia/Sydney",
+  "now": "2026-11-03T11:10:00+11:00",
+  "messages": [
+    {
+      "sender_name": "Alex",
+      "text": "Sam's dentist is at 3 today so I'm taking him after lunch",
+      "sent_at": "2026-11-03T11:00:00+11:00",
+      "outbound": false
+    },
+    {
+      "sender_name": "You",
+      "text": "ok, good luck to him",
+      "sent_at": "2026-11-03T11:05:00+11:00",
+      "outbound": true
+    }
+  ],
+  "pending": [],
+  "expected": {
+    "kind": "nothing"
+  }
+}

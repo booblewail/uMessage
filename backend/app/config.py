@@ -43,7 +43,27 @@ class GoogleSettings(BaseSettings):
         return value if value.is_absolute() else BACKEND_DIR / value
 
 
-class Settings(DatabaseSettings, GoogleSettings):
+class PlanModelSettings(BaseSettings):
+    """The Gemini Plan Model's settings (ADR-0005); the plan detection accuracy check
+    (`make eval-plans`) needs only this part."""
+
+    model_config = SettingsConfigDict(
+        env_file=REPO_ROOT / ".env", env_file_encoding="utf-8", extra="ignore"
+    )
+
+    # The Gemini API key (empty: detection is off in real mode) and model.
+    gemini_api_key: SecretStr | None = None
+    gemini_model: str = "gemini-3.5-flash"
+    # Plan Model decisions less confident than this (0-1) create or change nothing.
+    plan_confidence_threshold: float = Field(default=0.5, ge=0, le=1)
+
+    @field_validator("gemini_api_key", mode="before")
+    @classmethod
+    def _empty_key_is_unset(cls, value: object) -> object:
+        return None if isinstance(value, str) and not value.strip() else value
+
+
+class Settings(DatabaseSettings, GoogleSettings, PlanModelSettings):
     api_token: SecretStr = Field(min_length=16)
     umessage_mode: Literal["real", "demo"] = "real"
     user_timezone: str = "UTC"
@@ -57,14 +77,9 @@ class Settings(DatabaseSettings, GoogleSettings):
     new_messages_poll_seconds: float = Field(default=3.0, gt=0)
     # Demo mode only: about how often a scripted fixture Message arrives (seconds; 0 = never).
     demo_new_message_seconds: float = Field(default=30.0, ge=0)
-    # Plan detection (ADR-0005): the Gemini API key (empty: detection is off in real mode)
-    # and model.
-    gemini_api_key: SecretStr | None = None
-    gemini_model: str = "gemini-3.5-flash"
+    # Plan detection (ADR-0005; the Gemini Plan Model's own settings are above).
     # How long a Chat must be quiet after a new Message before it is checked for plans (s).
     plan_settle_seconds: float = Field(default=60.0, ge=0)
-    # Plan Model decisions less confident than this (0-1) create or change nothing.
-    plan_confidence_threshold: float = Field(default=0.5, ge=0, le=1)
     # At most this many Plan Model calls at a time.
     plan_max_concurrent: int = Field(default=2, ge=1)
     # How long a confirmed timed plan lasts on the calendar when the Chat gave no end.
@@ -77,7 +92,7 @@ class Settings(DatabaseSettings, GoogleSettings):
             return [origin.strip() for origin in value.split(",") if origin.strip()]
         return value
 
-    @field_validator("gemini_api_key", "beeper_access_token", mode="before")
+    @field_validator("beeper_access_token", mode="before")
     @classmethod
     def _empty_is_unset(cls, value: object) -> object:
         return None if isinstance(value, str) and not value.strip() else value

@@ -1,0 +1,24 @@
+{
+  "name": "deadline_rent_due",
+  "description": "A deadline with a day is not a plan the user attends.",
+  "timezone": "Australia/Sydney",
+  "now": "2026-11-03T09:30:00+11:00",
+  "messages": [
+    {
+      "sender_name": "Lou",
+      "text": "Reminder rent is due Friday, $650 each",
+      "sent_at": "2026-11-03T09:00:00+11:00",
+      "outbound": false
+    },
+    {
+      "sender_name": "You",
+      "text": "Will transfer tonight",
+      "sent_at": "2026-11-03T09:20:00+11:00",
+      "outbound": true
+    }
+  ],
+  "pending": [],
+  "expected": {
+    "kind": "nothing"
+  }
+}

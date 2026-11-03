@@ -5,7 +5,7 @@ API_PORT ?= 8000
 FRONTEND_PORT ?= 3000
 INBOX_URL ?= http://127.0.0.1:$(FRONTEND_PORT)/inbox
 
-.PHONY: help dev install migrate test lint open-inbox google-auth
+.PHONY: help dev install migrate test lint open-inbox google-auth eval-plans
 
 help:
 	@echo "make dev      start backend + frontend and open the inbox (UMESSAGE_MODE=demo make dev: fakes)"
@@ -14,6 +14,7 @@ help:
 	@echo "make migrate  apply database migrations"
 	@echo "make google-auth  sign in to Google once, so plans can go on your calendar"
 	@echo "make install  install backend and frontend dependencies"
+	@echo "make eval-plans  check plan detection accuracy against real Gemini (GEMINI_API_KEY)"
 
 # First run: create .env from the example with a freshly generated API_TOKEN.
 .env:
@@ -65,3 +66,7 @@ test: backend/.venv
 lint: backend/.venv frontend/node_modules
 	cd backend && uv run ruff check . && uv run ruff format --check .
 	cd frontend && npm run type-check && npm run lint && npm run build
+
+# Calls the real Gemini API (GEMINI_API_KEY in .env); writes backend/data/plan-eval-report.md.
+eval-plans: backend/.venv
+	cd backend && uv run pytest -m live tests/test_plan_eval_live.py -s

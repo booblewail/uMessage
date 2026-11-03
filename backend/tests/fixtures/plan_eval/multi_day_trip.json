@@ -1,0 +1,34 @@
+{
+  "name": "multi_day_trip",
+  "description": "A trip over three days with no times: all-day, first to last day.",
+  "timezone": "Australia/Sydney",
+  "now": "2026-11-03T20:30:00+11:00",
+  "messages": [
+    {
+      "sender_name": "Jake",
+      "text": "Booked the campsite at Jervis Bay for Fri 20th to Sun 22nd!",
+      "sent_at": "2026-11-03T20:11:00+11:00",
+      "outbound": false
+    },
+    {
+      "sender_name": "Jake",
+      "text": "You still coming?",
+      "sent_at": "2026-11-03T20:12:00+11:00",
+      "outbound": false
+    },
+    {
+      "sender_name": "You",
+      "text": "Amazing, count me in",
+      "sent_at": "2026-11-03T20:25:00+11:00",
+      "outbound": true
+    }
+  ],
+  "pending": [],
+  "expected": {
+    "kind": "new",
+    "start_date": "2026-11-20",
+    "end_date": "2026-11-22",
+    "all_day": true,
+    "location_contains": "Jervis Bay"
+  }
+}

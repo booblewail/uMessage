@@ -1,0 +1,36 @@
+{
+  "name": "cancelled_plan",
+  "description": "A plan made and then called off within the window: nothing to add.",
+  "timezone": "Australia/Sydney",
+  "now": "2026-11-04T08:40:00+11:00",
+  "messages": [
+    {
+      "sender_name": "Sophie",
+      "text": "Dinner Friday 7pm at Mamak?",
+      "sent_at": "2026-11-02T18:00:00+11:00",
+      "outbound": false
+    },
+    {
+      "sender_name": "You",
+      "text": "Yes please",
+      "sent_at": "2026-11-02T18:12:00+11:00",
+      "outbound": true
+    },
+    {
+      "sender_name": "Sophie",
+      "text": "can't make Friday anymore, sorry 😞 work thing came up",
+      "sent_at": "2026-11-04T08:30:00+11:00",
+      "outbound": false
+    },
+    {
+      "sender_name": "You",
+      "text": "No worries, another time!",
+      "sent_at": "2026-11-04T08:35:00+11:00",
+      "outbound": true
+    }
+  ],
+  "pending": [],
+  "expected": {
+    "kind": "nothing"
+  }
+}

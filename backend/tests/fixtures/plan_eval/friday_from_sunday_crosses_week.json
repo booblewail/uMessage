@@ -1,0 +1,28 @@
+{
+  "name": "friday_from_sunday_crosses_week",
+  "description": "Sent on a Sunday, 'Friday' is the Friday five days later, in the next week.",
+  "timezone": "Australia/Sydney",
+  "now": "2026-11-08T10:20:00+11:00",
+  "messages": [
+    {
+      "sender_name": "Priya",
+      "text": "Drinks Friday after work? 6pm at The Baxter Inn",
+      "sent_at": "2026-11-08T10:02:00+11:00",
+      "outbound": false
+    },
+    {
+      "sender_name": "You",
+      "text": "I'm in",
+      "sent_at": "2026-11-08T10:15:00+11:00",
+      "outbound": true
+    }
+  ],
+  "pending": [],
+  "expected": {
+    "kind": "new",
+    "start_date": "2026-11-13",
+    "start_time": "18:00",
+    "all_day": false,
+    "location_contains": "Baxter"
+  }
+}

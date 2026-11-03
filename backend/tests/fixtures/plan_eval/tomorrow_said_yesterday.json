@@ -1,0 +1,28 @@
+{
+  "name": "tomorrow_said_yesterday",
+  "description": "'Tomorrow' in a Message sent last night means today, not the day after now.",
+  "timezone": "Australia/Sydney",
+  "now": "2026-11-03T08:00:00+11:00",
+  "messages": [
+    {
+      "sender_name": "Tom",
+      "text": "Coffee tomorrow at 10 at Single O?",
+      "sent_at": "2026-11-02T21:00:00+11:00",
+      "outbound": false
+    },
+    {
+      "sender_name": "You",
+      "text": "Yes, see you then",
+      "sent_at": "2026-11-02T21:06:00+11:00",
+      "outbound": true
+    }
+  ],
+  "pending": [],
+  "expected": {
+    "kind": "new",
+    "start_date": "2026-11-03",
+    "start_time": "10:00",
+    "all_day": false,
+    "location_contains": "Single O"
+  }
+}

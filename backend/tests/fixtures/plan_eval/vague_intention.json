@@ -1,0 +1,24 @@
+{
+  "name": "vague_intention",
+  "description": "A wish to meet with no agreed day or time.",
+  "timezone": "Australia/Sydney",
+  "now": "2026-11-03T16:00:00+11:00",
+  "messages": [
+    {
+      "sender_name": "Chris",
+      "text": "We should catch up sometime!",
+      "sent_at": "2026-11-03T15:40:00+11:00",
+      "outbound": false
+    },
+    {
+      "sender_name": "You",
+      "text": "Yes definitely, it's been too long",
+      "sent_at": "2026-11-03T15:52:00+11:00",
+      "outbound": true
+    }
+  ],
+  "pending": [],
+  "expected": {
+    "kind": "nothing"
+  }
+}

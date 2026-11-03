@@ -1,0 +1,27 @@
+{
+  "name": "all_day_beach_day",
+  "description": "A day out with a date but no time: an all-day plan.",
+  "timezone": "Australia/Sydney",
+  "now": "2026-11-04T19:45:00+11:00",
+  "messages": [
+    {
+      "sender_name": "Mia",
+      "text": "Beach day Saturday? Bondi, the whole day",
+      "sent_at": "2026-11-04T19:30:00+11:00",
+      "outbound": false
+    },
+    {
+      "sender_name": "You",
+      "text": "Yes!! I'll bring the umbrella",
+      "sent_at": "2026-11-04T19:41:00+11:00",
+      "outbound": true
+    }
+  ],
+  "pending": [],
+  "expected": {
+    "kind": "new",
+    "start_date": "2026-11-07",
+    "all_day": true,
+    "location_contains": "Bondi"
+  }
+}

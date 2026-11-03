@@ -1,0 +1,36 @@
+{
+  "name": "casual_times_in_small_talk",
+  "description": "Small talk that mentions clock times but makes no plan.",
+  "timezone": "Australia/Sydney",
+  "now": "2026-11-03T09:15:00+11:00",
+  "messages": [
+    {
+      "sender_name": "Ben",
+      "text": "lol I woke up at 7 and still missed the bus",
+      "sent_at": "2026-11-03T09:01:00+11:00",
+      "outbound": false
+    },
+    {
+      "sender_name": "You",
+      "text": "classic. I was up till 2am finishing that show",
+      "sent_at": "2026-11-03T09:04:00+11:00",
+      "outbound": true
+    },
+    {
+      "sender_name": "Ben",
+      "text": "which one",
+      "sent_at": "2026-11-03T09:05:00+11:00",
+      "outbound": false
+    },
+    {
+      "sender_name": "You",
+      "text": "Severance, finally",
+      "sent_at": "2026-11-03T09:07:00+11:00",
+      "outbound": true
+    }
+  ],
+  "pending": [],
+  "expected": {
+    "kind": "nothing"
+  }
+}

@@ -1,0 +1,32 @@
+# Secrets and credentials
+.env
+.env.*
+!.env.example
+token.json
+credentials.json
+
+# SQLite database (backend/data/umessage.db by default)
+backend/data/
+*.db
+*.db-journal
+*.db-wal
+*.db-shm
+*.sqlite
+*.sqlite3
+
+# Python
+.venv/
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.ruff_cache/
+
+# Node / Next.js
+node_modules/
+.next/
+out/
+*.tsbuildinfo
+next-env.d.ts
+
+# OS
+.DS_Store

@@ -36,6 +36,12 @@ markers = [
 [tool.ruff]
 line-length = 100
 target-version = "py312"
+# Standalone one-off script (Phase 0 spike, #2), run on its own with `uv run`.
+extend-exclude = ["scripts/beeper_spike.py"]
 
 [tool.ruff.lint]
 select = ["E", "F", "W", "I", "B", "UP", "ASYNC", "RUF"]
+
+[tool.ruff.lint.isort]
+known-first-party = ["app", "tests"]
+known-third-party = ["alembic"]

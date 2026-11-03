@@ -14,4 +14,5 @@ The original design logged in to Beeper's Matrix homeserver with `matrix-nio`. B
 ## Consequences
 
 - uMessage only ingests while Beeper Desktop is open; the UI must show when it is not.
+- Beeper keeps the full history, so uMessage stores only a recent window of Messages (First Import takes about the last 50 per Chat active in the past 30 days, then every new Message) and asks Beeper for older history when the user scrolls back. Anchor Messages are never pruned.
 - Phase 0 must confirm, for each of iMessage, Instagram, Messenger, WhatsApp and Discord: Chats are listed, a Message can be read, a Message can be sent; and find out whether new Messages are pushed or must be polled.

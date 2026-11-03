@@ -40,6 +40,10 @@ _Avoid_: Event (bare)
 A plan the user would attend at a specific date and time (a dinner, an appointment, a meeting), found in a Chat and awaiting or past the user's review. Deadlines, other people's happenings, and vague intentions without an agreed time are not Detected Events.
 _Avoid_: Event (bare), suggestion, candidate
 
+**Anchor Message**:
+The latest Message that shaped a Detected Event; the inbox shows the Detected Event beneath it, and links back to the plan jump to it.
+_Avoid_: Source message, trigger message
+
 **Pending Review**:
 The state of a Detected Event the user has not yet confirmed or dismissed.
 

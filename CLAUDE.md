@@ -1,78 +1,68 @@
-# Unified Matrix Inbox & AI Calendar Sync
+# uMessage: Unified Inbox & Plan Detection
 
 ## Project Overview
-A full-stack unified messaging client and automated event extractor.
-- **Ingestion:** Connects to a Matrix homeserver (Beeper, or a local Conduit-family homeserver for testing) via `matrix-nio`. See `docs/matrix-spike.md` for the chosen connection/encryption approach.
-- **Backend:** Python 3.12, FastAPI, SQLAlchemy 2.0 (async, `asyncpg`) + Alembic, PostgreSQL 16, Google GenAI SDK (model from `GEMINI_MODEL`), Google Calendar API.
+A personal, single-user companion to Beeper that runs on the user's Mac (ADR-0002): one inbox across iMessage, Instagram, Messenger, WhatsApp and Discord, which spots plans in Chats and, once the user approves, adds them to Google Calendar.
+- **Ingestion:** Beeper Desktop's local API on `127.0.0.1` (ADR-0003, proposed until the Phase 0 spike confirms it; Matrix via `matrix-nio` is the fallback).
+- **Backend:** Python 3.12, FastAPI, SQLAlchemy 2.0 (async) + Alembic on SQLite (ADR-0001, ADR-0004), Google GenAI SDK (model from `GEMINI_MODEL`, ADR-0005), Google Calendar API.
 - **Frontend:** Next.js (App Router), TypeScript, Tailwind CSS, Lucide Icons.
 
-The implementation is tracked phase by phase in `PLAN.md`. Work on one phase at a time and follow its workflow instructions.
+Read `CONTEXT.md` for the domain language (Chat, Message, Detected Event, Calendar Entry, Anchor Message, ...) and use it in code, tests, issues and UI copy. Decisions live in `docs/adr/`. Work is tracked as GitHub issues (see Agent skills below); `PLAN.md` is the overview.
 
-## Monorepo Structure
+## Architecture
+The backend core never talks to the outside world directly. Three adapter interfaces sit at the edges, each with a real and a fake implementation:
+- **Message Source**: lists Chats, reads Messages, sends Messages (Beeper Desktop adapter; fake with fixture Chats).
+- **Plan Model**: turns a window of Messages into a decision about a Detected Event (Gemini adapter; fake).
+- **Calendar**: creates Calendar Entries (Google adapter; fake).
+
+The app is built by an app factory that takes these three adapters, so tests and **demo mode** (`UMESSAGE_MODE=demo`: fake adapters, seeded fixture Chats, no credentials needed) run the real app with fakes.
+
+## Repository Structure
 ```text
 .
-├── docker-compose.yml          # PostgreSQL 16 + local Matrix homeserver (tests)
+├── Makefile                    # make dev / test / lint
 ├── .env.example
-├── PLAN.md                     # Phased implementation plan / progress state
+├── CONTEXT.md                  # Domain glossary
+├── PLAN.md                     # Overview + links to the GitHub issues
 ├── docs/
+│   ├── adr/                    # Architecture decision records
 │   ├── agents/                 # Agent-skill config: issue tracker, triage labels, domain docs
-│   └── matrix-spike.md         # Phase 0 findings: Beeper access, E2EE, platform detection
+│   └── beeper-spike.md         # Phase 0 findings
 ├── backend/
 │   ├── pyproject.toml          # Managed with uv
-│   ├── alembic/                # Migrations (alembic/versions/)
-│   ├── scripts/
-│   │   ├── matrix_spike.py     # Phase 0 feasibility script
-│   │   └── google_auth.py      # One-time local OAuth → token.json
-│   ├── app/
-│   │   ├── main.py             # FastAPI entrypoint, lifespan, auth, CORS, /ws
-│   │   ├── config.py           # Pydantic Settings (.env loader)
-│   │   ├── db.py               # Async engine + session dependency
-│   │   ├── models.py           # SQLAlchemy models — single source of truth for DB schema
-│   │   ├── ws_manager.py       # WebSocket ConnectionManager (NEW_MESSAGE, EVENT_DETECTED)
-│   │   ├── platforms.py        # Bridge state → Platform enum
-│   │   ├── matrix_listener.py  # Async matrix-nio sync loop + room/message ingest
-│   │   ├── extractor.py        # Regex pre-filter + debounce + 5-msg context + Gemini structured JSON
-│   │   ├── gcal_service.py     # Google Calendar credentials & event insertion
-│   │   └── routers/
-│   │       ├── rooms.py        # GET /api/rooms, GET /api/rooms/{id}/messages, POST /reply
-│   │       └── events.py       # GET /api/events, POST /confirm, POST /dismiss
-│   └── tests/                  # Pytest suite
+│   ├── alembic/                # Migrations
+│   ├── scripts/                # beeper_spike.py, google_auth.py
+│   ├── app/                    # FastAPI app: core services, adapters, routers
+│   └── tests/                  # Pytest suite (HTTP API + WebSocket seam, fake adapters)
 └── frontend/
     ├── package.json
     └── src/
-        ├── app/
-        │   ├── inbox/page.tsx  # Unified multi-platform chat view + inline event chips
-        │   └── events/page.tsx # Pending review queue + confirmed calendar agenda
-        ├── components/         # Modular UI components (<200 lines per file)
-        └── lib/
-            ├── api.ts          # Typed REST client
-            └── ws.ts           # Reconnecting WebSocket hook
+        ├── app/                # /inbox, /events
+        ├── components/         # UI components (<200 lines per file)
+        └── lib/                # api.ts (typed REST client), ws.ts (reconnecting WebSocket hook)
 ```
 
 ## Commands
 ```bash
-docker compose up -d db                          # start PostgreSQL
+make dev                                         # backend + frontend, opens the inbox
+UMESSAGE_MODE=demo make dev                      # same, with fake adapters and fixture Chats
 cd backend && uv sync                            # install backend deps
 cd backend && uv run alembic upgrade head        # apply migrations
-cd backend && uv run uvicorn app.main:app --port 8000   # run API (single worker only)
-cd backend && uv run pytest                      # unit tests (no external services)
-cd backend && uv run pytest -m integration       # needs local homeserver
-cd backend && uv run pytest -m live              # calls the real Gemini API
+cd backend && uv run pytest                      # tests (no external services)
+cd backend && uv run pytest -m live              # calls the real Gemini API (needs GEMINI_API_KEY)
 cd backend && uv run ruff check . && uv run ruff format --check .
 cd frontend && npm run type-check && npm run lint && npm run build
 ```
 
 ## Conventions & Guardrails
-- Schema changes go through `models.py` plus a new Alembic migration; never edit an applied migration.
+- Tests drive the app through its HTTP API and WebSocket with fake adapters; don't test internals or mock internal collaborators.
+- Schema changes go through the SQLAlchemy models plus a new Alembic migration; never edit an applied migration.
+- All times are stored in UTC (SQLite has no time-zone type); convert to `USER_TIMEZONE` only for display and for resolving relative dates against each Message's own timestamp.
 - DB columns are snake_case; API JSON is camelCase (Pydantic alias generator).
-- All datetimes are timezone-aware (`timestamptz`); relative dates are resolved in `USER_TIMEZONE` against the message's own timestamp.
-- The Matrix sync loop runs exactly once per deployment: run uvicorn with one worker; no `--workers N`.
-- Long-running background work uses tracked `asyncio` tasks, not FastAPI `BackgroundTasks`.
+- Long-running background work uses tracked `asyncio` tasks, not FastAPI `BackgroundTasks`; run uvicorn with a single worker.
 - Blocking SDKs (Google API client) are called via `asyncio.to_thread`.
-- Unit tests mock Gemini, Google Calendar and Matrix; real-service tests are marked `integration` / `live`.
-- All `/api/*` routes (except health) and `/ws` require `API_TOKEN`; bind the API to localhost.
-- Never commit `.env`, `token.json`, `credentials.json` or the Matrix crypto store.
-- Use a paid Gemini API tier (or Vertex AI) — chat content is private.
+- All `/api/*` routes (except health) and `/ws` require `API_TOKEN`; the API binds to `127.0.0.1` only.
+- Excluded Chats are never sent to the Plan Model.
+- Never commit `.env`, `token.json`, `credentials.json` or the SQLite database.
 - Frontend components stay under 200 lines per file.
 
 ## Agent skills

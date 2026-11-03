@@ -1,0 +1,3 @@
+# Plan detection uses Gemini in the cloud, not a local model
+
+Everything else in uMessage stays on the user's Mac, but checking Messages for plans sends a short window of chat text (the five Messages around a keyword match) to Google's Gemini API on a paid tier, where Google does not use the data for training. A local model would keep chats fully private but is noticeably worse at messy, multi-Message plans, and detection quality is the whole product. Excluded Chats are never sent. The model call sits behind one small interface so switching provider, or to a local model, is a contained change.

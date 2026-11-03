@@ -50,6 +50,8 @@ class Settings(DatabaseSettings, GoogleSettings):
     frontend_url: str = "http://127.0.0.1:3000"
     cors_origins: Annotated[list[str], NoDecode] = ["http://localhost:3000"]
     beeper_api_url: str = "http://127.0.0.1:23373"
+    # Token created in Beeper Desktop (Settings -> Developers); empty: none is sent.
+    beeper_access_token: SecretStr | None = None
     demo_beeper_running: bool = True
     # How often new Messages are fetched from the Message Source (seconds).
     new_messages_poll_seconds: float = Field(default=3.0, gt=0)
@@ -75,7 +77,7 @@ class Settings(DatabaseSettings, GoogleSettings):
             return [origin.strip() for origin in value.split(",") if origin.strip()]
         return value
 
-    @field_validator("gemini_api_key", mode="before")
+    @field_validator("gemini_api_key", "beeper_access_token", mode="before")
     @classmethod
     def _empty_is_unset(cls, value: object) -> object:
         return None if isinstance(value, str) and not value.strip() else value

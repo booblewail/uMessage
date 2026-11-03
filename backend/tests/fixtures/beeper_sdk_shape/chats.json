@@ -1,0 +1,150 @@
+{
+  "_note": "SYNTHETIC, hand-written in the shape of Beeper's official SDK, not recorded. The Chats Beeper Desktop holds; the test's fake API pages them (newest activity first) for GET /v1/chats and /v1/chats/search, and serves one for GET /v1/chats/{chatID}. Phase 0 (#2) must confirm the `network` values and how Discord server channels and merged Chats look.",
+  "items": [
+    {
+      "id": "!imsg-alex:beeper.local", "accountID": "imessagego", "network": "iMessage",
+      "title": "Alex Chen", "type": "single",
+      "participants": {"items": [
+        {"id": "@sam:beeper.com", "fullName": "Sam Taylor", "isSelf": true},
+        {"id": "imsg-alex", "fullName": "Alex Chen", "isSelf": false, "username": "+15550100"}
+      ], "total": 2, "hasMore": false},
+      "lastActivity": "2026-10-20T18:30:00.000Z", "unreadCount": 1,
+      "isArchived": false, "isMuted": false, "isReadOnly": false, "isPinned": false
+    },
+    {
+      "id": "!ig-climbing:beeper.local", "accountID": "instagramgo", "network": "Instagram",
+      "title": "Climbing crew", "type": "group",
+      "participants": {"items": [
+        {"id": "@sam:beeper.com", "fullName": "Sam Taylor", "isSelf": true},
+        {"id": "ig-jo", "fullName": "Jo Park", "isSelf": false, "username": "jo.climbs"},
+        {"id": "ig-lee", "fullName": "Lee Wong", "isSelf": false, "username": "leewong"}
+      ], "total": 3, "hasMore": false},
+      "lastActivity": "2026-10-20T17:00:00.000Z", "unreadCount": 0,
+      "isArchived": false, "isMuted": false, "isReadOnly": false, "isPinned": false
+    },
+    {
+      "id": "!fb-jordan:beeper.local", "accountID": "facebookgo", "network": "Messenger",
+      "title": "Jordan Lee", "type": "single",
+      "participants": {"items": [
+        {"id": "@sam:beeper.com", "fullName": "Sam Taylor", "isSelf": true},
+        {"id": "fb-jordan", "fullName": "Jordan Lee", "isSelf": false}
+      ], "total": 2, "hasMore": false},
+      "lastActivity": "2026-10-20T16:45:00.000Z", "unreadCount": 0,
+      "isArchived": false, "isMuted": false, "isReadOnly": false, "isPinned": false
+    },
+    {
+      "id": "!fb-priya:beeper.local", "accountID": "facebookgo",
+      "title": "Priya Shah", "type": "single",
+      "participants": {"items": [
+        {"id": "@sam:beeper.com", "fullName": "Sam Taylor", "isSelf": true},
+        {"id": "fb-priya", "fullName": "Priya Shah", "isSelf": false}
+      ], "total": 2, "hasMore": false},
+      "lastActivity": "2026-10-20T16:30:00.000Z", "unreadCount": 0,
+      "isArchived": true, "isMuted": false, "isReadOnly": false, "isPinned": false
+    },
+    {
+      "id": "!wa-family:beeper.local", "accountID": "whatsapp", "network": "WhatsApp",
+      "title": "Family", "type": "group",
+      "participants": {"items": [
+        {"id": "@sam:beeper.com", "fullName": "Sam Taylor", "isSelf": true},
+        {"id": "wa-mum", "fullName": "Mum", "isSelf": false, "username": "+15550101"},
+        {"id": "wa-dad", "fullName": "Dad", "isSelf": false, "username": "+15550102"}
+      ], "total": 3, "hasMore": false},
+      "lastActivity": "2026-10-20T16:05:00.000Z", "unreadCount": 2,
+      "isArchived": false, "isMuted": false, "isReadOnly": false, "isPinned": true
+    },
+    {
+      "id": "!tg-news:beeper.local", "accountID": "telegram", "network": "Telegram",
+      "title": "News bot", "type": "single",
+      "participants": {"items": [
+        {"id": "@sam:beeper.com", "fullName": "Sam Taylor", "isSelf": true},
+        {"id": "tg-newsbot", "fullName": "News bot", "isSelf": false}
+      ], "total": 2, "hasMore": false},
+      "lastActivity": "2026-10-20T16:00:00.000Z", "unreadCount": 9,
+      "isArchived": false, "isMuted": true, "isReadOnly": false, "isPinned": false
+    },
+    {
+      "id": "!dc-riley:beeper.local", "accountID": "discordgo", "network": "Discord",
+      "title": "Riley", "type": "single",
+      "participants": {"items": [
+        {"id": "@sam:beeper.com", "fullName": "Sam Taylor", "isSelf": true},
+        {"id": "dc-riley", "fullName": "Riley", "isSelf": false, "username": "riley"}
+      ], "total": 2, "hasMore": false},
+      "lastActivity": "2026-10-20T15:30:00.000Z", "unreadCount": 0,
+      "isArchived": false, "isMuted": false, "isReadOnly": false, "isPinned": false
+    },
+    {
+      "id": "!dc-weekend:beeper.local", "accountID": "discordgo", "network": "Discord",
+      "title": "Weekend plans", "type": "group",
+      "participants": {"items": [
+        {"id": "@sam:beeper.com", "fullName": "Sam Taylor", "isSelf": true},
+        {"id": "dc-riley", "fullName": "Riley", "isSelf": false},
+        {"id": "dc-max", "fullName": "Max", "isSelf": false},
+        {"id": "dc-kim", "fullName": "Kim", "isSelf": false}
+      ], "total": 4, "hasMore": false},
+      "lastActivity": "2026-10-20T15:00:00.000Z", "unreadCount": 0,
+      "isArchived": false, "isMuted": false, "isReadOnly": false, "isPinned": false
+    },
+    {
+      "id": "!dc-general:beeper.local", "accountID": "discordgo", "network": "Discord",
+      "title": "general", "type": "group",
+      "participants": {"items": [
+        {"id": "@sam:beeper.com", "fullName": "Sam Taylor", "isSelf": true},
+        {"id": "dc-mod", "fullName": "Server mod", "isSelf": false}
+      ], "total": 250, "hasMore": true},
+      "lastActivity": "2026-10-20T14:30:00.000Z", "unreadCount": 40,
+      "isArchived": false, "isMuted": true, "isReadOnly": false, "isPinned": false
+    },
+    {
+      "id": "!dc-announcements:beeper.local", "accountID": "discordgo", "network": "Discord",
+      "title": "#announcements", "type": "group",
+      "participants": {"items": [
+        {"id": "@sam:beeper.com", "fullName": "Sam Taylor", "isSelf": true},
+        {"id": "dc-mod", "fullName": "Server mod", "isSelf": false}
+      ], "total": 8, "hasMore": false},
+      "lastActivity": "2026-10-20T14:00:00.000Z", "unreadCount": 1,
+      "isArchived": false, "isMuted": false, "isReadOnly": true, "isPinned": false
+    },
+    {
+      "id": "!merged-casey:beeper.local", "accountID": "whatsapp", "network": "WhatsApp",
+      "title": "Casey", "type": "single",
+      "merge": {"chatIDs": ["!wa-casey:beeper.local", "!ig-casey:beeper.local"]},
+      "participants": {"items": [
+        {"id": "@sam:beeper.com", "fullName": "Sam Taylor", "isSelf": true},
+        {"id": "wa-casey", "fullName": "Casey", "isSelf": false}
+      ], "total": 2, "hasMore": false},
+      "lastActivity": "2026-10-20T13:30:00.000Z", "unreadCount": 0,
+      "isArchived": false, "isMuted": false, "isReadOnly": false, "isPinned": false
+    },
+    {
+      "id": "!wa-casey:beeper.local", "accountID": "whatsapp", "network": "WhatsApp",
+      "title": "Casey", "type": "single", "mergedIntoChatID": "!merged-casey:beeper.local",
+      "participants": {"items": [
+        {"id": "@sam:beeper.com", "fullName": "Sam Taylor", "isSelf": true},
+        {"id": "wa-casey", "fullName": "Casey", "isSelf": false}
+      ], "total": 2, "hasMore": false},
+      "lastActivity": "2026-10-20T13:30:00.000Z", "unreadCount": 0,
+      "isArchived": false, "isMuted": false, "isReadOnly": false, "isPinned": false
+    },
+    {
+      "id": "!ig-casey:beeper.local", "accountID": "instagramgo", "network": "Instagram",
+      "title": "Casey", "type": "single", "mergedIntoChatID": "!merged-casey:beeper.local",
+      "participants": {"items": [
+        {"id": "@sam:beeper.com", "fullName": "Sam Taylor", "isSelf": true},
+        {"id": "ig-casey", "fullName": "Casey", "isSelf": false}
+      ], "total": 2, "hasMore": false},
+      "lastActivity": "2026-10-19T09:00:00.000Z", "unreadCount": 0,
+      "isArchived": false, "isMuted": false, "isReadOnly": false, "isPinned": false
+    },
+    {
+      "id": "!wa-old:beeper.local", "accountID": "whatsapp", "network": "WhatsApp",
+      "title": "Old landlord", "type": "single",
+      "participants": {"items": [
+        {"id": "@sam:beeper.com", "fullName": "Sam Taylor", "isSelf": true},
+        {"id": "wa-landlord", "fullName": "Old landlord", "isSelf": false}
+      ], "total": 2, "hasMore": false},
+      "lastActivity": "2026-08-01T10:00:00.000Z", "unreadCount": 0,
+      "isArchived": false, "isMuted": false, "isReadOnly": false, "isPinned": false
+    }
+  ]
+}

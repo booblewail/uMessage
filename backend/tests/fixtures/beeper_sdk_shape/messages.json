@@ -1,0 +1,18 @@
+{
+  "_note": "SYNTHETIC, hand-written in the shape of Beeper's official SDK, not recorded. The Messages Beeper Desktop holds; the test's fake API pages them newest first (by `sortKey`) for GET /v1/chats/{chatID}/messages and /v1/messages/search. Phase 0 (#2) must confirm the `type` values, whether `senderName` exists, and that a `sortKey` works as a paging cursor.",
+  "items": [
+    {"id": "wa-f-7", "chatID": "!wa-family:beeper.local", "accountID": "whatsapp", "senderID": "wa-mum", "senderName": "Mum", "sortKey": "1007", "timestamp": "2026-10-20T16:05:00.000Z", "type": "TEXT", "text": "Dinner at ours on Sunday at 6?", "isSender": false},
+    {"id": "wa-f-6", "chatID": "!wa-family:beeper.local", "accountID": "whatsapp", "senderID": "wa-dad", "senderName": "Dad", "sortKey": "1006", "timestamp": "2026-10-20T16:04:00.000Z", "type": "REACTION", "text": "👍", "isSender": false},
+    {"id": "wa-f-5", "chatID": "!wa-family:beeper.local", "accountID": "whatsapp", "senderID": "@sam:beeper.com", "senderName": "Sam Taylor", "sortKey": "1005", "timestamp": "2026-10-20T16:03:00.000Z", "type": "TEXT", "text": "Sounds good", "isSender": true},
+    {"id": "wa-f-4", "chatID": "!wa-family:beeper.local", "accountID": "whatsapp", "senderID": "wa-dad", "sortKey": "1004", "timestamp": "2026-10-20T16:02:00.000Z", "type": "TEXT", "text": "I'll bring dessert", "isSender": false},
+    {"id": "wa-f-3", "chatID": "!wa-family:beeper.local", "accountID": "whatsapp", "senderID": "wa-mum", "senderName": "Mum", "sortKey": "1003", "timestamp": "2026-10-20T16:01:00.000Z", "type": "IMAGE", "isSender": false, "attachments": [{"type": "img", "mimeType": "image/jpeg"}]},
+    {"id": "wa-f-2", "chatID": "!wa-family:beeper.local", "accountID": "whatsapp", "senderID": "wa-mum", "senderName": "Mum", "sortKey": "1002", "timestamp": "2026-10-20T16:00:00.000Z", "type": "IMAGE", "text": "Look at this cake", "isSender": false, "attachments": [{"type": "img", "mimeType": "image/jpeg"}]},
+    {"id": "wa-f-1", "chatID": "!wa-family:beeper.local", "accountID": "whatsapp", "senderID": "wa-cousin", "sortKey": "1001", "timestamp": "2026-10-20T15:59:00.000Z", "type": "TEXT", "text": "hi all", "isSender": false},
+    {"id": "wa-f-0", "chatID": "!wa-family:beeper.local", "accountID": "whatsapp", "senderID": "wa-mum", "senderName": "Mum", "sortKey": "1000", "timestamp": "2026-10-20T15:58:00.000Z", "type": "TEXT", "isSender": false},
+
+    {"id": "imsg-a-2", "chatID": "!imsg-alex:beeper.local", "accountID": "imessagego", "senderID": "imsg-alex", "senderName": "Alex Chen", "sortKey": "2002", "timestamp": "2026-10-20T18:30:00.000Z", "type": "TEXT", "text": "Coffee tomorrow at 10?", "isSender": false},
+    {"id": "imsg-a-1", "chatID": "!imsg-alex:beeper.local", "accountID": "imessagego", "senderID": "@sam:beeper.com", "senderName": "Sam Taylor", "sortKey": "2001", "timestamp": "2026-10-20T18:00:00.000Z", "type": "TEXT", "text": "Long time no see!", "isSender": true},
+
+    {"id": "ig-c-1", "chatID": "!ig-climbing:beeper.local", "accountID": "instagramgo", "senderID": "ig-jo", "senderName": "Jo Park", "sortKey": "3001", "timestamp": "2026-10-20T17:00:00.000Z", "type": "TEXT", "text": "Gym on Thursday?", "isSender": false}
+  ]
+}

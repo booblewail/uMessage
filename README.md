@@ -32,6 +32,14 @@ make dev
 
 The inbox shows whether Beeper Desktop is running. Settings live in `.env`; every one is documented in `.env.example`.
 
+### Connecting your real Beeper
+
+1. In Beeper Desktop, open Settings → Developers, enable the local API and create an access token.
+2. Put it in `.env` as `BEEPER_ACCESS_TOKEN=...`. `BEEPER_API_URL` defaults to Beeper Desktop's local address, `http://127.0.0.1:23373`.
+3. Run `make dev` (real mode). First Import then brings in your Chats on iMessage, Instagram, Messenger, WhatsApp and Discord active in the past 30 days (Chats on other networks, and Discord server channels, are left out), and new Messages are picked up by polling Beeper Desktop every `NEW_MESSAGES_POLL_SECONDS`.
+
+If the token is missing or wrong, the inbox shows Beeper Desktop as not running and the backend log says to set `BEEPER_ACCESS_TOKEN`. The adapter (`backend/app/adapters/beeper_desktop.py`) is built from the shapes in Beeper's official SDK and has not yet been checked against a real Beeper Desktop: the Phase 0 spike (`backend/scripts/beeper_spike.py`, #2) records real responses to confirm or adjust its mappings.
+
 ### Connecting Google Calendar
 
 "Add to Calendar" on a plan uMessage spotted puts it on your primary Google Calendar. uMessage talks to Google with an OAuth client of your own, created once in Google Cloud (free):

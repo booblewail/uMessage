@@ -141,7 +141,11 @@ def build_app(settings: Settings | None = None) -> FastAPI:
 
             background_jobs.append(demo_new_messages)
     else:
-        message_source = BeeperDesktopMessageSource(settings.beeper_api_url)
+        beeper_token = settings.beeper_access_token
+        message_source = BeeperDesktopMessageSource(
+            settings.beeper_api_url,
+            access_token=beeper_token.get_secret_value() if beeper_token else None,
+        )
         key = settings.gemini_api_key
         plan_model = (
             GeminiPlanModel(api_key=key.get_secret_value(), model=settings.gemini_model)

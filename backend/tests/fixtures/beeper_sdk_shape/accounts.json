@@ -1,0 +1,11 @@
+{
+  "_note": "SYNTHETIC, hand-written in the shape of Beeper's official SDK, not recorded. `items` is what GET /v1/accounts answers (the test's fake serves it as a bare list, or wrapped in {items}).",
+  "items": [
+    {"accountID": "imessagego", "network": "iMessage", "user": {"id": "@sam:beeper.com", "fullName": "Sam Taylor", "isSelf": true}},
+    {"accountID": "instagramgo", "network": "Instagram", "user": {"id": "@sam:beeper.com", "fullName": "Sam Taylor", "isSelf": true}},
+    {"accountID": "facebookgo", "network": "Facebook Messenger", "user": {"id": "@sam:beeper.com", "fullName": "Sam Taylor", "isSelf": true}},
+    {"accountID": "whatsapp", "network": "WhatsApp", "user": {"id": "@sam:beeper.com", "fullName": "Sam Taylor", "isSelf": true}},
+    {"accountID": "discordgo", "network": "Discord", "user": {"id": "@sam:beeper.com", "fullName": "Sam Taylor", "isSelf": true}},
+    {"accountID": "telegram", "network": "Telegram", "user": {"id": "@sam:beeper.com", "fullName": "Sam Taylor", "isSelf": true}}
+  ]
+}

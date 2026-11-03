@@ -1,0 +1,6 @@
+{
+  "_note": "SYNTHETIC, hand-written in the shape of Beeper's official SDK (github.com/beeper/desktop-api-js), not recorded. What GET /v1/info answers. Replace with a recorded response from Phase 0 (#2).",
+  "app": {"name": "Beeper Desktop", "version": "4.1.0"},
+  "platform": {"os": "macos", "arch": "arm64"},
+  "server": {"status": "running", "port": 23373}
+}

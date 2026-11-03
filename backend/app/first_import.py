@@ -9,6 +9,9 @@ completion is stored, so later starts skip it. Progress lives in memory for `/ap
   leaving out Discord server channels (they aren't Chats).
 - Any other failure stops it with the error shown in the status; it runs again on the next
   start. Chats and Messages already stored are never duplicated, so a re-run is safe.
+- Before listing Chats it takes the Message Source's cursor for "now" and stores it with the
+  completion, so live updates (`app.live_updates`) pick up every Message that arrives while
+  it runs (any already imported are not stored twice).
 """
 
 import asyncio
@@ -20,7 +23,7 @@ from enum import StrEnum
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
 from app.adapters.protocols import ChatKind, MessageSource, MessageSourceUnavailableError
-from app.inbox import save_chat
+from app.inbox import save_chat, store_cursor
 from app.models import FirstImportRecord
 
 logger = logging.getLogger(__name__)
@@ -95,6 +98,7 @@ class FirstImport:
 
     async def _import(self) -> None:
         self.progress.state = FirstImportState.RUNNING
+        new_messages_from = (await self._source.new_messages(since=None)).cursor
         active_since = datetime.now(UTC) - IMPORT_WINDOW
         listed = await self._source.list_chats(active_since=active_since)
         chats = sorted(
@@ -117,5 +121,6 @@ class FirstImport:
             session.add(
                 FirstImportRecord(completed_at=datetime.now(UTC), chats_imported=len(chats))
             )
+            await store_cursor(session, new_messages_from)
             await session.commit()
         self.progress.state = FirstImportState.COMPLETED

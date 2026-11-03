@@ -68,6 +68,8 @@ class SourceMessage:
     `source_id` is the Message Source's id for it, unique within its Chat. The adapter
     supplies `sender_name` (resolving it from the Chat's participants if it must) and sets
     `outbound` for Messages the user sent from any client. `sent_at` is timezone-aware.
+    `paging_key` is the Message Source's own, opaque position for the Message (Beeper's
+    `sortKey`), if it pages by one: the core stores it and hands it back in `older_messages`.
     """
 
     source_id: str
@@ -75,12 +77,56 @@ class SourceMessage:
     sent_at: datetime
     text: str
     outbound: bool
+    paging_key: str | None = None
+
+
+@dataclass(frozen=True, slots=True)
+class SourceMessageRef:
+    """Points at a Message the core has: its `source_id` and `paging_key` as reported."""
+
+    source_id: str
+    paging_key: str | None
+
+
+@dataclass(frozen=True, slots=True)
+class OlderMessages:
+    """What `MessageSource.older_messages` found: up to `limit` Messages, in any order, and
+    whether the Chat has any older still (False: this is the start of its history)."""
+
+    messages: Sequence[SourceMessage]
+    has_more: bool
+
+
+@dataclass(frozen=True, slots=True)
+class NewMessages:
+    """What `MessageSource.new_messages` found: Messages that arrived after a cursor.
+
+    `messages` pairs each Message with its Chat (as it is now), in the order they arrived.
+    `cursor` is opaque to the core: it is stored and handed back as `since` next time, so it
+    must survive a restart. Fetching again from an older cursor may repeat Messages; the
+    core stores each Message once.
+    """
+
+    messages: Sequence[tuple[SourceChat, SourceMessage]]
+    cursor: str
+
+
+@dataclass(frozen=True, slots=True)
+class SentMessage:
+    """A Message the Message Source accepted for sending.
+
+    `source_id` may be provisional (Beeper's `pendingMessageID`): the same Message can come
+    back through `new_messages` under a different, final id. `sent_at` is timezone-aware.
+    """
+
+    source_id: str
+    sent_at: datetime
 
 
 class MessageSource(Protocol):
     """Where Chats and Messages come from and where Outbound Messages go (Beeper Desktop).
 
-    Later tickets add new Messages as they arrive, older history and sending Messages.
+    Any operation may raise `MessageSourceUnavailableError` while it can't be reached.
     """
 
     async def status(self) -> MessageSourceStatus: ...
@@ -94,6 +140,27 @@ class MessageSource(Protocol):
         """The newest `limit` text Messages of a Chat, in any order.
 
         Non-text items (media without text, reactions, state events) are left out.
+        """
+        ...
+
+    async def new_messages(self, *, since: str | None) -> NewMessages:
+        """Text Messages in any Chat (of any `ChatKind`) that arrived after cursor `since`.
+
+        `since=None` starts from now: no Messages, just a cursor for the present.
+        """
+        ...
+
+    async def older_messages(
+        self, chat_source_id: str, *, before: SourceMessageRef | None, limit: int
+    ) -> OlderMessages:
+        """The (up to) `limit` text Messages of a Chat just older than Message `before`
+        (the newest ones when None), going back through its full history."""
+        ...
+
+    async def send_message(self, chat_source_id: str, text: str) -> SentMessage:
+        """Send a text Message to a Chat; raises if the Message Source didn't accept it.
+
+        The sent Message is later reported by `new_messages` too, as an outbound Message.
         """
         ...
 

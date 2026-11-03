@@ -6,23 +6,26 @@ import type { Chat, Platform } from "@/lib/api";
 import { PLATFORM_LOOKS } from "@/lib/platforms";
 import { useAppStatus } from "@/lib/useAppStatus";
 import { useChats } from "@/lib/useChats";
+import { useInboxSocket } from "@/lib/ws";
 import { ChatList } from "@/components/ChatList";
 import { DemoModeBadge } from "@/components/DemoModeBadge";
 import { FirstImportNotice } from "@/components/FirstImportNotice";
+import { LiveIndicator } from "@/components/LiveIndicator";
 import { MessageSourceBanner } from "@/components/MessageSourceBanner";
 import { MessageThread } from "@/components/MessageThread";
 import { PlatformFilter } from "@/components/PlatformFilter";
 
 export function InboxView() {
   const state = useAppStatus();
+  const socket = useInboxSocket();
   const status = state.kind === "loaded" ? state.status : null;
   const firstImport = status?.firstImport ?? null;
 
   const [platform, setPlatform] = useState<Platform | null>(null);
   const [selected, setSelected] = useState<Chat | null>(null);
-  // Reload the list as First Import adds Chats.
-  const reloadKey = firstImport ? `${firstImport.state}:${firstImport.chatsImported}` : "";
-  const chats = useChats(platform, reloadKey);
+  // Reload the list as First Import adds Chats, and after the live socket reconnects.
+  const importKey = firstImport ? `${firstImport.state}:${firstImport.chatsImported}` : "";
+  const chats = useChats(platform, `${importKey}:${socket.reconnects}`, socket.subscribe);
 
   const emptyText =
     firstImport && firstImport.state !== "completed"
@@ -38,7 +41,10 @@ export function InboxView() {
           <Inbox className="size-6 text-indigo-600" aria-hidden />
           Inbox
         </h1>
-        {status?.mode === "demo" && <DemoModeBadge />}
+        <div className="flex items-center gap-2">
+          <LiveIndicator live={socket.live} />
+          {status?.mode === "demo" && <DemoModeBadge />}
+        </div>
       </header>
 
       <MessageSourceBanner state={state} />
@@ -61,7 +67,12 @@ export function InboxView() {
 
         <main className="flex min-h-0 flex-col overflow-hidden rounded-xl border border-slate-200 bg-white">
           {selected ? (
-            <MessageThread key={selected.id} chat={selected} />
+            <MessageThread
+              key={selected.id}
+              chat={selected}
+              subscribe={socket.subscribe}
+              reconnects={socket.reconnects}
+            />
           ) : (
             <div className="flex flex-1 flex-col items-center justify-center gap-2 p-10 text-sm text-slate-500">
               <MessageSquareDashed className="size-8 text-slate-300" aria-hidden />

@@ -73,6 +73,9 @@ async def test_first_import_keeps_the_last_50_messages_of_each_chat(
         async with http_client(manager.app) as client:
             await wait_for_first_import(client)
             chat_id = (await client.get("/api/chats")).json()["chats"][0]["id"]
+            # Older Messages come from Beeper Desktop on demand; without it, only the stored
+            # ones are there.
+            message_source.running = False
             texts = await all_message_texts(client, chat_id)
 
     assert texts == [f"Message m-{n}" for n in range(11, 61)]

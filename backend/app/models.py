@@ -84,10 +84,17 @@ class Chat(Base):
     last_activity_at: Mapped[datetime] = mapped_column(UtcDateTime)
     # An Excluded Chat (#11) is still shown, but never checked for plans.
     excluded: Mapped[bool] = mapped_column(Boolean, default=False, server_default="0")
+    # Whether the Message Source said there are no Messages older than the stored ones.
+    history_complete: Mapped[bool] = mapped_column(Boolean, default=False, server_default="0")
 
 
 class Message(Base):
-    """A text Message in a Chat; `outbound` marks the user's own (an Outbound Message)."""
+    """A text Message in a Chat; `outbound` marks the user's own (an Outbound Message).
+
+    `pending` marks an Outbound Message sent from uMessage that the Message Source hasn't
+    reported back yet: its `source_id` is the provisional one sending returned, replaced by
+    the final id once the Message comes back (see `inbox.save_new_message`).
+    """
 
     __tablename__ = "messages"
     __table_args__ = (
@@ -102,6 +109,9 @@ class Message(Base):
     sent_at: Mapped[datetime] = mapped_column(UtcDateTime)
     text: Mapped[str] = mapped_column(Text)
     outbound: Mapped[bool] = mapped_column(Boolean)
+    pending: Mapped[bool] = mapped_column(Boolean, default=False, server_default="0")
+    # The Message Source's opaque position for it (`SourceMessage.paging_key`).
+    paging_key: Mapped[str | None] = mapped_column(String, nullable=True)
 
 
 class FirstImportRecord(Base):
@@ -113,3 +123,18 @@ class FirstImportRecord(Base):
     id: Mapped[int] = mapped_column(Integer, primary_key=True, default=1)
     completed_at: Mapped[datetime] = mapped_column(UtcDateTime)
     chats_imported: Mapped[int] = mapped_column(Integer)
+
+
+class NewMessagesCursor(Base):
+    """The single row holding where fetching new Messages from the Message Source resumes.
+
+    The cursor is opaque (the Message Source adapter makes it); it is written in the same
+    transaction as the Messages it covers, so a restart neither loses nor repeats any.
+    """
+
+    __tablename__ = "new_messages_cursor"
+    __table_args__ = (CheckConstraint("id = 1", name="single_row"),)
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, default=1)
+    cursor: Mapped[str] = mapped_column(String)
+    updated_at: Mapped[datetime] = mapped_column(UtcDateTime)

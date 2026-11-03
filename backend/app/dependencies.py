@@ -1,10 +1,13 @@
 """FastAPI dependencies that hand routes the adapters the app was built with."""
 
+import asyncio
+
 from fastapi import Request
 
 from app.adapters.protocols import Calendar, MessageSource, PlanModel
 from app.config import Settings
 from app.first_import import FirstImport
+from app.ws_manager import ConnectionManager
 
 
 def get_settings(request: Request) -> Settings:
@@ -25,3 +28,11 @@ def get_calendar(request: Request) -> Calendar:
 
 def get_first_import(request: Request) -> FirstImport:
     return request.app.state.first_import
+
+
+def get_connections(request: Request) -> ConnectionManager:
+    return request.app.state.connections
+
+
+def get_inbox_lock(request: Request) -> asyncio.Lock:
+    return request.app.state.inbox_lock

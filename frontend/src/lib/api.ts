@@ -1,7 +1,7 @@
 // Typed REST client for the uMessage backend.
 
 export const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://127.0.0.1:8000";
-const API_TOKEN = process.env.NEXT_PUBLIC_API_TOKEN || "";
+export const API_TOKEN = process.env.NEXT_PUBLIC_API_TOKEN || "";
 
 export type Mode = "real" | "demo";
 
@@ -99,9 +99,22 @@ async function request<T>(path: string, init: RequestInit = {}): Promise<T> {
     throw new ApiError("unauthorized", "The backend rejected the API token", 401);
   }
   if (!response.ok) {
-    throw new ApiError("http", `${path} failed with HTTP ${response.status}`, response.status);
+    const detail = await errorDetail(response);
+    throw new ApiError("http", detail ?? `${path} failed with HTTP ${response.status}`, response.status);
   }
   return (await response.json()) as T;
+}
+
+/** The backend's own explanation of an error (FastAPI's `detail`), if it gave a readable one. */
+async function errorDetail(response: Response): Promise<string | null> {
+  try {
+    const body = (await response.json()) as { detail?: unknown };
+    if (typeof body.detail === "string") return body.detail;
+    if (Array.isArray(body.detail) && typeof body.detail[0]?.msg === "string") return body.detail[0].msg;
+  } catch {
+    // not JSON
+  }
+  return null;
 }
 
 function query(params: Record<string, string | number | undefined>): string {
@@ -125,4 +138,11 @@ export const api = {
     request<{ chats: Chat[] }>(`/api/chats${query({ platform })}`),
   messages: (chatId: number, options: { before?: number; limit?: number } = {}) =>
     request<MessagePage>(`/api/chats/${chatId}/messages${query(options)}`),
+  /** Send a Message through Beeper Desktop; resolves to the stored Outbound Message. */
+  sendMessage: (chatId: number, text: string) =>
+    request<Message>(`/api/chats/${chatId}/messages`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ text }),
+    }),
 };

@@ -1,6 +1,7 @@
 import asyncio
 from collections.abc import AsyncIterator, Awaitable, Callable
 from contextlib import AsyncExitStack
+from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
@@ -16,9 +17,10 @@ from app.config import BACKEND_DIR, Settings
 from app.main import create_app
 
 API_TOKEN = "test-api-token-0123456789"
-# How often First Import re-checks for Beeper Desktop in tests (seconds).
+# How often the app re-checks for Beeper Desktop, and fetches new Messages, in tests (seconds).
 RETRY_SECONDS = 0.01
-# How long a test waits for First Import to reach a state before failing.
+POLL_SECONDS = 0.01
+# How long a test waits for something to happen before failing.
 WAIT_SECONDS = 5.0
 
 
@@ -36,6 +38,7 @@ def make_settings(database_url: str, **overrides: object) -> Settings:
         "api_token": API_TOKEN,
         "database_url": database_url,
         "umessage_mode": "demo",
+        "new_messages_poll_seconds": POLL_SECONDS,
     }
     values.update(overrides)
     return Settings(_env_file=None, **values)  # type: ignore[arg-type]
@@ -63,7 +66,7 @@ def make_app(settings: Settings, message_source: FakeMessageSource) -> FastAPI:
         message_source=message_source,
         plan_model=FakePlanModel(),
         calendar=FakeCalendar(),
-        first_import_retry_seconds=RETRY_SECONDS,
+        retry_seconds=RETRY_SECONDS,
     )
 
 
@@ -102,22 +105,48 @@ async def wait_for_first_import(client: AsyncClient, *, until: str = "completed"
             await asyncio.sleep(RETRY_SECONDS)
 
 
+async def eventually[T](check: Callable[[], Awaitable[T | None]]) -> T:
+    """Re-run `check` until it returns something other than None (or fail after a while)."""
+    async with asyncio.timeout(WAIT_SECONDS):
+        while True:
+            if (result := await check()) is not None:
+                return result
+            await asyncio.sleep(POLL_SECONDS)
+
+
+@dataclass(frozen=True, slots=True)
+class RunningApp:
+    app: FastAPI
+    client: AsyncClient
+
+
 StartApp = Callable[[], Awaitable[AsyncClient]]
+StartRunningApp = Callable[[], Awaitable[RunningApp]]
 
 
 @pytest.fixture
-async def start_app(
+async def start_running_app(
     settings: Settings, message_source: FakeMessageSource
-) -> AsyncIterator[StartApp]:
-    """Start the app once the test has filled the fake Message Source; the returned client
-    is ready once First Import has completed."""
+) -> AsyncIterator[StartRunningApp]:
+    """Start the app once the test has filled the fake Message Source; it is returned once
+    First Import has completed."""
     async with AsyncExitStack() as stack:
 
-        async def start() -> AsyncClient:
+        async def start() -> RunningApp:
             app = make_app(settings, message_source)
             manager = await stack.enter_async_context(LifespanManager(app))
             client = await stack.enter_async_context(http_client(manager.app))  # type: ignore[arg-type]
             await wait_for_first_import(client)
-            return client
+            return RunningApp(app=manager.app, client=client)  # type: ignore[arg-type]
 
         yield start
+
+
+@pytest.fixture
+def start_app(start_running_app: StartRunningApp) -> StartApp:
+    """Like `start_running_app`, returning just an HTTP client with the right API token."""
+
+    async def start() -> AsyncClient:
+        return (await start_running_app()).client
+
+    return start

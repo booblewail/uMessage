@@ -2,6 +2,8 @@
 
 import { useEffect, useState } from "react";
 import { api, toApiError, type ApiError, type Chat, type Platform } from "@/lib/api";
+import { upsertChat } from "@/lib/messageList";
+import type { Subscribe } from "@/lib/ws";
 
 export type ChatsState =
   | { kind: "loading" }
@@ -10,10 +12,11 @@ export type ChatsState =
 
 /**
  * The Chat list for `platform` (all Platforms when null), newest first. It reloads whenever
- * `reloadKey` changes (e.g. as First Import adds Chats); the previous list stays on screen
- * while the next one loads.
+ * `reloadKey` changes (e.g. as First Import adds Chats, or the live socket reconnects); the
+ * previous list stays on screen while the next one loads. `NEW_MESSAGE` events move their
+ * Chat to the top (adding it if it is new).
  */
-export function useChats(platform: Platform | null, reloadKey: string): ChatsState {
+export function useChats(platform: Platform | null, reloadKey: string, subscribe: Subscribe): ChatsState {
   const [state, setState] = useState<ChatsState>({ kind: "loading" });
 
   useEffect(() => {
@@ -30,6 +33,17 @@ export function useChats(platform: Platform | null, reloadKey: string): ChatsSta
       cancelled = true;
     };
   }, [platform, reloadKey]);
+
+  useEffect(
+    () =>
+      subscribe((event) => {
+        if (event.type !== "NEW_MESSAGE" || (platform && event.chat.platform !== platform)) return;
+        setState((current) =>
+          current.kind === "loaded" ? { kind: "loaded", chats: upsertChat(current.chats, event.chat) } : current,
+        );
+      }),
+    [platform, subscribe],
+  );
 
   return state;
 }

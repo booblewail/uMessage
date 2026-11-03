@@ -30,6 +30,10 @@ class Settings(DatabaseSettings):
     cors_origins: Annotated[list[str], NoDecode] = ["http://localhost:3000"]
     beeper_api_url: str = "http://127.0.0.1:23373"
     demo_beeper_running: bool = True
+    # How often new Messages are fetched from the Message Source (seconds).
+    new_messages_poll_seconds: float = Field(default=3.0, gt=0)
+    # Demo mode only: about how often a scripted fixture Message arrives (seconds; 0 = never).
+    demo_new_message_seconds: float = Field(default=30.0, ge=0)
 
     @field_validator("cors_origins", mode="before")
     @classmethod

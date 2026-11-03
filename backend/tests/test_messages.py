@@ -45,6 +45,7 @@ async def test_messages_show_sender_time_text_and_whether_they_are_outbound(
             "sentAt": page["messages"][0]["sentAt"],
             "text": "Dinner Friday?",
             "outbound": False,
+            "detectedEvents": [],
         },
         {
             "chatId": chat_id,
@@ -52,6 +53,7 @@ async def test_messages_show_sender_time_text_and_whether_they_are_outbound(
             "sentAt": page["messages"][1]["sentAt"],
             "text": "Yes! 8pm?",
             "outbound": True,
+            "detectedEvents": [],
         },
     ]
     assert [datetime.fromisoformat(m["sentAt"]) for m in page["messages"]] == [

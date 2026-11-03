@@ -7,6 +7,7 @@ from fastapi import Request
 from app.adapters.protocols import Calendar, MessageSource, PlanModel
 from app.config import Settings
 from app.first_import import FirstImport
+from app.plan_detection import PlanDetection
 from app.ws_manager import ConnectionManager
 
 
@@ -36,3 +37,7 @@ def get_connections(request: Request) -> ConnectionManager:
 
 def get_inbox_lock(request: Request) -> asyncio.Lock:
     return request.app.state.inbox_lock
+
+
+def get_plan_detection(request: Request) -> PlanDetection:
+    return request.app.state.plan_detection

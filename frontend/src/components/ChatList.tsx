@@ -1,4 +1,4 @@
-import { LoaderCircle, User, Users } from "lucide-react";
+import { CalendarOff, LoaderCircle, User, Users } from "lucide-react";
 import type { Chat } from "@/lib/api";
 import { formatChatTime } from "@/lib/format";
 import type { ChatsState } from "@/lib/useChats";
@@ -29,6 +29,7 @@ function ChatRow({ chat, selected, onSelect }: { chat: Chat; selected: boolean; 
         aria-current={selected ? "true" : undefined}
         data-testid="chat-row"
         data-platform={chat.platform}
+        data-excluded={chat.excluded}
         className={`flex w-full items-start gap-3 px-4 py-3 text-left transition-colors ${
           selected ? "bg-indigo-50" : "hover:bg-slate-50"
         }`}
@@ -38,7 +39,15 @@ function ChatRow({ chat, selected, onSelect }: { chat: Chat; selected: boolean; 
         </span>
         <span className="min-w-0 flex-1">
           <span className="flex items-baseline justify-between gap-2">
-            <span className="truncate font-medium">{chat.title}</span>
+            <span className="flex min-w-0 items-center gap-1.5">
+              <span className="truncate font-medium">{chat.title}</span>
+              {chat.excluded && (
+                <span title="Excluded Chat: plan detection is off" data-testid="excluded-chat-mark">
+                  <CalendarOff className="size-3.5 shrink-0 text-slate-400" aria-hidden />
+                  <span className="sr-only">(Excluded Chat: plan detection off)</span>
+                </span>
+              )}
+            </span>
             <time dateTime={chat.lastMessageAt} className="shrink-0 text-xs text-slate-500">
               {formatChatTime(chat.lastMessageAt)}
             </time>

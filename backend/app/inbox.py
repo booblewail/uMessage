@@ -58,12 +58,12 @@ async def save_chat(
     session: AsyncSession, chat: SourceChat, messages: Sequence[SourceMessage]
 ) -> None:
     """Store a Chat and its Messages; a Chat or Message already stored is not duplicated."""
-    chat_id = await _save_chat_details(session, chat)
+    chat_id, excluded = await _save_chat_details(session, chat)
     if not messages:
         return
     await session.execute(
         insert(Message)
-        .values([_message_row(chat_id, message) for message in messages])
+        .values([_message_row(chat_id, message, excluded) for message in messages])
         .on_conflict_do_nothing(index_elements=["chat_id", "source_id"])
     )
 
@@ -78,7 +78,7 @@ async def save_new_message(
     different, final id: it is matched to the pending one (same Chat, same text, close in
     time; oldest first), which takes on the final id and time instead of being stored twice.
     """
-    chat_id = await _save_chat_details(session, chat)
+    chat_id, excluded = await _save_chat_details(session, chat)
     stored = await session.scalar(
         select(Message).where(Message.chat_id == chat_id, Message.source_id == message.source_id)
     )
@@ -94,7 +94,7 @@ async def save_new_message(
         return None
     inserted = await session.execute(
         insert(Message)
-        .values(_message_row(chat_id, message))
+        .values(_message_row(chat_id, message, excluded))
         .on_conflict_do_nothing(index_elements=["chat_id", "source_id"])
         .returning(Message.id)
     )
@@ -105,6 +105,7 @@ async def save_sent_message(
     session: AsyncSession, chat_id: int, sent: SentMessage, text: str
 ) -> Message:
     """Store a Message just sent from uMessage, pending until the Message Source reports it."""
+    chat = await session.get_one(Chat, chat_id)
     message = Message(
         chat_id=chat_id,
         source_id=sent.source_id,
@@ -113,6 +114,7 @@ async def save_sent_message(
         text=text,
         outbound=True,
         pending=True,
+        excluded_from_plans=chat.excluded,
     )
     session.add(message)
     await session.flush()
@@ -151,7 +153,8 @@ async def store_cursor(session: AsyncSession, cursor: str) -> None:
     )
 
 
-def _message_row(chat_id: int, message: SourceMessage) -> dict[str, object]:
+def _message_row(chat_id: int, message: SourceMessage, chat_excluded: bool) -> dict[str, object]:
+    """A Message stored while its Chat is an Excluded Chat is never sent to the Plan Model."""
     return {
         "chat_id": chat_id,
         "source_id": message.source_id,
@@ -160,11 +163,12 @@ def _message_row(chat_id: int, message: SourceMessage) -> dict[str, object]:
         "text": message.text,
         "outbound": message.outbound,
         "paging_key": message.paging_key,
+        "excluded_from_plans": chat_excluded,
     }
 
 
-async def _save_chat_details(session: AsyncSession, chat: SourceChat) -> int:
-    """Insert or update a Chat by its source id; returns its id."""
+async def _save_chat_details(session: AsyncSession, chat: SourceChat) -> tuple[int, bool]:
+    """Insert or update a Chat by its source id; returns its id and whether it is excluded."""
     upsert = insert(Chat).values(
         source_id=chat.source_id,
         platform=chat.platform,
@@ -180,8 +184,9 @@ async def _save_chat_details(session: AsyncSession, chat: SourceChat) -> int:
             "title": upsert.excluded.title,
             "last_activity_at": upsert.excluded.last_activity_at,
         },
-    ).returning(Chat.id)
-    return (await session.execute(upsert)).scalar_one()
+    ).returning(Chat.id, Chat.excluded)
+    chat_id, excluded = (await session.execute(upsert)).one()
+    return chat_id, excluded
 
 
 async def list_chats(
@@ -292,7 +297,7 @@ async def _store_older(session: AsyncSession, chat: Chat, older: OlderMessages) 
     if older.messages:
         await session.execute(
             insert(Message)
-            .values([_message_row(chat.id, message) for message in older.messages])
+            .values([_message_row(chat.id, m, chat.excluded) for m in older.messages])
             .on_conflict_do_nothing(index_elements=["chat_id", "source_id"])
         )
     if not older.has_more:

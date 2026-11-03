@@ -1,19 +1,21 @@
 "use client";
 
-import { ChevronUp, LoaderCircle, User, Users } from "lucide-react";
+import { ChevronUp, LoaderCircle } from "lucide-react";
 import type { Chat } from "@/lib/api";
 import { useMessages, type MessagesState } from "@/lib/useMessages";
 import { useThreadScroll } from "@/lib/useThreadScroll";
 import type { Subscribe } from "@/lib/ws";
 import { MessageBubble } from "@/components/MessageBubble";
-import { PlatformBadge } from "@/components/PlatformBadge";
 import { ReplyBar } from "@/components/ReplyBar";
+import { ThreadHeader } from "@/components/ThreadHeader";
 
 interface Props {
   chat: Chat;
   subscribe: Subscribe;
   /** Changes whenever the live socket reconnects (the thread then refetches). */
   reconnects: number;
+  /** Called with the Chat as it is after a change made here (excluded or included). */
+  onChatChanged: (chat: Chat) => void;
 }
 
 type Loaded = Extract<MessagesState, { kind: "loaded" }>;
@@ -57,26 +59,18 @@ function OlderMessages({ state, onLoad }: { state: Loaded; onLoad: () => void })
 
 /**
  * The open Chat: its Messages oldest to newest, scrolled to the newest, with new ones added
- * live and older ones loaded on scrolling to the top. Mount with key={chat.id}.
+ * live and older ones loaded on scrolling to the top, and Detected Events beneath their
+ * Anchor Messages. Mount with key={chat.id}.
  */
-export function MessageThread({ chat, subscribe, reconnects }: Props) {
-  const { state, loadOlder, addMessage } = useMessages(chat.id, subscribe, reconnects);
+export function MessageThread({ chat, subscribe, reconnects, onChatChanged }: Props) {
+  const { state, loadOlder, addMessage, showEvent } = useMessages(chat.id, subscribe, reconnects);
   const loaded = state.kind === "loaded" ? state : null;
   const canLoadOlder = loaded !== null && loaded.olderCursor !== null && !loaded.loadingOlder;
   const { scroller, onScroll, requestOlder } = useThreadScroll(loaded?.messages ?? [], canLoadOlder, loadOlder);
 
-  const Avatar = chat.kind === "group" ? Users : User;
   return (
     <section aria-label={`Messages in ${chat.title}`} className="flex min-h-0 flex-1 flex-col">
-      <header className="flex items-center gap-3 border-b border-slate-200 px-5 py-3">
-        <span className="flex size-9 items-center justify-center rounded-full bg-slate-100 text-slate-500">
-          <Avatar className="size-4" aria-hidden />
-        </span>
-        <h2 className="min-w-0 flex-1 truncate font-semibold" data-testid="thread-title">
-          {chat.title}
-        </h2>
-        <PlatformBadge platform={chat.platform} />
-      </header>
+      <ThreadHeader chat={chat} onChatChanged={onChatChanged} />
 
       <div
         ref={scroller}
@@ -101,7 +95,7 @@ export function MessageThread({ chat, subscribe, reconnects }: Props) {
             ) : (
               <ol aria-label="Messages" className="flex flex-col gap-3">
                 {loaded.messages.map((message) => (
-                  <MessageBubble key={message.id} message={message} />
+                  <MessageBubble key={message.id} message={message} onEventChanged={showEvent} />
                 ))}
               </ol>
             )}

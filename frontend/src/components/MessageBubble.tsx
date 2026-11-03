@@ -1,9 +1,19 @@
 import { ArrowUpRight } from "lucide-react";
-import type { Message } from "@/lib/api";
+import type { DetectedEvent, Message } from "@/lib/api";
 import { formatMessageTime } from "@/lib/format";
+import { DetectedEventBanner } from "@/components/DetectedEventBanner";
 
-/** One Message; the user's own (an Outbound Message) sits on the right, marked "You". */
-export function MessageBubble({ message }: { message: Message }) {
+interface Props {
+  message: Message;
+  /** Called with a Detected Event beneath it once it changed (e.g. was Dismissed). */
+  onEventChanged: (event: DetectedEvent) => void;
+}
+
+/**
+ * One Message; the user's own (an Outbound Message) sits on the right, marked "You". The
+ * Detected Events it is the Anchor Message of show beneath it.
+ */
+export function MessageBubble({ message, onEventChanged }: Props) {
   const { outbound } = message;
   return (
     <li
@@ -32,6 +42,9 @@ export function MessageBubble({ message }: { message: Message }) {
       >
         {message.text}
       </p>
+      {message.detectedEvents.map((event) => (
+        <DetectedEventBanner key={event.id} event={event} outbound={outbound} onChanged={onEventChanged} />
+      ))}
     </li>
   );
 }

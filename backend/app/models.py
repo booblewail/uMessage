@@ -4,6 +4,7 @@ Every change here needs a new Alembic migration in `alembic/versions/`.
 """
 
 from datetime import UTC, datetime
+from enum import StrEnum
 from typing import Any
 
 from sqlalchemy import (
@@ -11,6 +12,7 @@ from sqlalchemy import (
     CheckConstraint,
     DateTime,
     Enum,
+    Float,
     ForeignKey,
     Index,
     Integer,
@@ -60,15 +62,19 @@ class UtcDateTime(TypeDecorator[datetime]):
         return value.replace(tzinfo=UTC)
 
 
-def _str_enum(enum: type[Platform] | type[ChatKind]) -> Enum:
+def _str_enum(enum: type[StrEnum], *, length: int = 16) -> Enum:
     """Store a StrEnum by value in a plain VARCHAR column (no native enum type)."""
     return Enum(
         enum,
         native_enum=False,
         create_constraint=False,
-        length=16,
+        length=length,
         values_callable=lambda members: [member.value for member in members],
     )
+
+
+def _now() -> datetime:
+    return datetime.now(UTC)
 
 
 class Chat(Base):
@@ -112,6 +118,46 @@ class Message(Base):
     pending: Mapped[bool] = mapped_column(Boolean, default=False, server_default="0")
     # The Message Source's opaque position for it (`SourceMessage.paging_key`).
     paging_key: Mapped[str | None] = mapped_column(String, nullable=True)
+    # Stored while its Chat was an Excluded Chat: never sent to the Plan Model, not even as
+    # context once the Chat is included again (#11, ADR-0005).
+    excluded_from_plans: Mapped[bool] = mapped_column(Boolean, default=False, server_default="0")
+
+
+class DetectedEventStatus(StrEnum):
+    PENDING_REVIEW = "pending_review"
+    CONFIRMED = "confirmed"
+    DISMISSED = "dismissed"
+
+
+class DetectedEvent(Base):
+    """A plan found in a Chat, shown beneath its Anchor Message (the latest Message that
+    shaped it). Times are UTC; an all-day plan starts (and ends) at local midnight of its
+    date in the user's time zone. `end_at` is None when the Chat didn't say.
+    `calendar_entry_id` is the Calendar Entry made when it is Confirmed (#9)."""
+
+    __tablename__ = "detected_events"
+    __table_args__ = (
+        Index("ix_detected_events_chat_id_status", "chat_id", "status"),
+        Index("ix_detected_events_start_at", "start_at"),
+    )
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    chat_id: Mapped[int] = mapped_column(ForeignKey("chats.id", ondelete="CASCADE"))
+    anchor_message_id: Mapped[int] = mapped_column(
+        ForeignKey("messages.id", ondelete="CASCADE"), index=True
+    )
+    title: Mapped[str] = mapped_column(String)
+    start_at: Mapped[datetime] = mapped_column(UtcDateTime)
+    end_at: Mapped[datetime | None] = mapped_column(UtcDateTime, nullable=True)
+    all_day: Mapped[bool] = mapped_column(Boolean)
+    location: Mapped[str | None] = mapped_column(String, nullable=True)
+    confidence: Mapped[float] = mapped_column(Float)
+    status: Mapped[DetectedEventStatus] = mapped_column(
+        _str_enum(DetectedEventStatus, length=16), default=DetectedEventStatus.PENDING_REVIEW
+    )
+    calendar_entry_id: Mapped[str | None] = mapped_column(String, unique=True, nullable=True)
+    created_at: Mapped[datetime] = mapped_column(UtcDateTime, default=_now)
+    updated_at: Mapped[datetime] = mapped_column(UtcDateTime, default=_now)
 
 
 class FirstImportRecord(Base):

@@ -15,6 +15,7 @@ from httpx import ASGITransport, AsyncClient
 from app.adapters.fakes import FakeCalendar, FakeMessageSource, FakePlanModel
 from app.config import BACKEND_DIR, Settings
 from app.main import create_app
+from tests.clock import FakeClock
 
 API_TOKEN = "test-api-token-0123456789"
 # How often the app re-checks for Beeper Desktop, and fetches new Messages, in tests (seconds).
@@ -60,19 +61,42 @@ def message_source() -> FakeMessageSource:
     return FakeMessageSource()
 
 
-def make_app(settings: Settings, message_source: FakeMessageSource) -> FastAPI:
+@pytest.fixture
+def plan_model() -> FakePlanModel:
+    """The Plan Model the app under test asks; tests script its decisions and read its calls."""
+    return FakePlanModel()
+
+
+@pytest.fixture
+def clock() -> FakeClock:
+    """Plan detection's settle delay only passes when the test calls `clock.advance(...)`."""
+    return FakeClock()
+
+
+def make_app(
+    settings: Settings,
+    message_source: FakeMessageSource,
+    plan_model: FakePlanModel | None = None,
+    clock: FakeClock | None = None,
+) -> FastAPI:
     return create_app(
         settings,
         message_source=message_source,
-        plan_model=FakePlanModel(),
+        plan_model=plan_model or FakePlanModel(),
         calendar=FakeCalendar(),
         retry_seconds=RETRY_SECONDS,
+        settle_sleep=(clock or FakeClock()).sleep,
     )
 
 
 @pytest.fixture
-async def app(settings: Settings, message_source: FakeMessageSource) -> AsyncIterator[FastAPI]:
-    async with LifespanManager(make_app(settings, message_source)) as manager:
+async def app(
+    settings: Settings,
+    message_source: FakeMessageSource,
+    plan_model: FakePlanModel,
+    clock: FakeClock,
+) -> AsyncIterator[FastAPI]:
+    async with LifespanManager(make_app(settings, message_source, plan_model, clock)) as manager:
         yield manager.app  # type: ignore[misc]
 
 
@@ -126,14 +150,17 @@ StartRunningApp = Callable[[], Awaitable[RunningApp]]
 
 @pytest.fixture
 async def start_running_app(
-    settings: Settings, message_source: FakeMessageSource
+    settings: Settings,
+    message_source: FakeMessageSource,
+    plan_model: FakePlanModel,
+    clock: FakeClock,
 ) -> AsyncIterator[StartRunningApp]:
     """Start the app once the test has filled the fake Message Source; it is returned once
     First Import has completed."""
     async with AsyncExitStack() as stack:
 
         async def start() -> RunningApp:
-            app = make_app(settings, message_source)
+            app = make_app(settings, message_source, plan_model, clock)
             manager = await stack.enter_async_context(LifespanManager(app))
             client = await stack.enter_async_context(http_client(manager.app))  # type: ignore[arg-type]
             await wait_for_first_import(client)

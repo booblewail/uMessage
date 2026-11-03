@@ -2,16 +2,29 @@
 channel and a long-quiet Chat that First Import leaves out. Times are relative to now.
 
 `demo_trickle` then makes scripted Messages arrive every so often (one starts a new Chat), so
-live updates can be seen.
+live updates can be seen; a few of them make or change a plan, which `demo_plan_decision`
+(demo mode's Plan Model) turns into Detected Events.
 """
 
 import asyncio
 import itertools
 import random
-from datetime import UTC, datetime, timedelta
+from datetime import UTC, datetime, time, timedelta
+from zoneinfo import ZoneInfo
 
 from app.adapters.fakes import YOU, FakeMessageSource
-from app.adapters.protocols import ChatKind, Platform, SourceChat, SourceMessage
+from app.adapters.protocols import (
+    ChatKind,
+    NewPlan,
+    NoPlan,
+    PlanDecision,
+    PlanDetails,
+    PlanRequest,
+    Platform,
+    SourceChat,
+    SourceMessage,
+    UpdatePlan,
+)
 
 # (source id, Platform, kind, title, [(sender, minutes ago, text), ...]); YOU marks
 # Outbound Messages.
@@ -166,16 +179,52 @@ _NEW_CHAT = SourceChat(
     title="Dana Ortiz",
     last_activity=datetime.now(UTC),
 )
+_DINNER_AT_MUMS = "Dinner at ours on Friday at 7?"
+_DINNER_LATER = "Actually can we make it 7:30? Dad's back late"
+_RAID_MOVED = "Raid moved to 9pm Wednesday"
 _TRICKLE: list[tuple[str, str, str]] = [
+    ("demo-im-mum", "Mum", _DINNER_AT_MUMS),
     ("demo-wa-climbing", "Lea", "Can someone bring a spare chalk bag?"),
-    ("demo-im-mum", "Mum", "Dad says hi! Don't forget your umbrella"),
     (_NEW_CHAT.source_id, "Dana Ortiz", "hey!! long time, are you around this weekend?"),
     ("demo-ig-priya", "Priya Shah", "the next opening is on the 14th btw"),
     ("demo-fb-flat", "Tom", "Who finished the oat milk"),
+    ("demo-im-mum", "Mum", _DINNER_LATER),
     ("demo-dc-jules", "jules", "queue up in 5?"),
     ("demo-wa-alex", "Alex Kim", "Found a few more photos, sending now"),
-    ("demo-dc-raid", "Mara", "Raid moved to 9pm"),
+    ("demo-dc-raid", "Mara", _RAID_MOVED),
 ]
+
+
+def demo_plan_decision(request: PlanRequest) -> PlanDecision:
+    """Demo mode's stand-in for Gemini: knows the plans in the scripted Messages above (by
+    the latest Message's text) and finds nothing anywhere else."""
+    latest = request.messages[-1]
+    tz = ZoneInfo(request.timezone)
+    sent = latest.sent_at.astimezone(tz)
+    pending = {plan.title: plan.id for plan in request.pending}
+    if latest.text in (_DINNER_AT_MUMS, _DINNER_LATER):
+        at = time(19, 30) if latest.text == _DINNER_LATER else time(19)
+        plan = PlanDetails(
+            title="Dinner at Mum's",
+            start=_next_weekday(sent, 4, at),
+            end=None,
+            all_day=False,
+            location="Mum's place",
+            confidence=0.9,
+        )
+        if plan.title in pending:
+            return UpdatePlan(pending[plan.title], plan)
+        return NewPlan(plan)
+    if latest.text == _RAID_MOVED and "Raid night" not in pending:
+        start = _next_weekday(sent, 2, time(21))
+        return NewPlan(PlanDetails("Raid night", start, None, False, None, confidence=0.8))
+    return NoPlan()
+
+
+def _next_weekday(after: datetime, weekday: int, at: time) -> datetime:
+    """The next `weekday` (0 = Monday) after `after`'s day, at `at` local wall time."""
+    days = (weekday - after.weekday() - 1) % 7 + 1
+    return datetime.combine(after.date() + timedelta(days=days), at)
 
 
 async def demo_trickle(source: FakeMessageSource, *, every_seconds: float) -> None:

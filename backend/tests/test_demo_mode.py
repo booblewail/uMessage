@@ -91,3 +91,23 @@ async def test_demo_mode_keeps_trickling_in_new_messages_after_a_restart(
     assert not {event["message"]["id"] for event in after} & {
         event["message"]["id"] for event in before
     }
+
+
+async def test_demo_mode_detects_a_plan_in_its_trickle_of_new_messages(database_url: str) -> None:
+    settings = make_settings(
+        database_url,
+        umessage_mode="demo",
+        demo_new_message_seconds=0.01,
+        plan_settle_seconds=0.01,
+    )
+
+    async with LifespanManager(build_app(settings)) as manager, http_client(manager.app) as client:
+        await wait_for_first_import(client)
+        async with inbox_socket(manager.app) as socket:
+            detected = await socket.receive_until("EVENT_DETECTED")
+        page = (await client.get(f"/api/chats/{detected['event']['chatId']}/messages")).json()
+
+    assert detected["event"]["status"] == "pending_review"
+    # Beneath its Anchor Message (a later demo Message may have moved it on already).
+    anchored = [e["id"] for m in page["messages"] for e in m["detectedEvents"]]
+    assert detected["event"]["id"] in anchored

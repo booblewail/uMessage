@@ -1,8 +1,8 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
-import { api, toApiError, type ApiError, type Message, type MessagePage } from "@/lib/api";
-import { mergeMessages } from "@/lib/messageList";
+import { api, toApiError, type ApiError, type DetectedEvent, type Message, type MessagePage } from "@/lib/api";
+import { mergeMessages, withDetectedEvent } from "@/lib/messageList";
 import type { Subscribe } from "@/lib/ws";
 
 export const PAGE_SIZE = 50;
@@ -40,14 +40,20 @@ function withNewestPage(current: MessagesState, page: MessagePage): MessagesStat
 /**
  * A Chat's Messages: the newest page first, then older pages prepended by `loadOlder` (from
  * Beeper Desktop once the stored ones run out, which the API does transparently).
- * `NEW_MESSAGE` events for the Chat are added live (each Message once); the newest page is
- * fetched again whenever `reconnects` changes. Mount it with `key={chatId}`.
+ * `NEW_MESSAGE` events for the Chat are added live (each Message once), and `EVENT_DETECTED`
+ * events put the Detected Event beneath its Anchor Message; the newest page is fetched again
+ * whenever `reconnects` changes. Mount it with `key={chatId}`.
  */
 export function useMessages(
   chatId: number,
   subscribe: Subscribe,
   reconnects: number,
-): { state: MessagesState; loadOlder: () => void; addMessage: (message: Message) => void } {
+): {
+  state: MessagesState;
+  loadOlder: () => void;
+  addMessage: (message: Message) => void;
+  showEvent: (event: DetectedEvent) => void;
+} {
   const [state, setState] = useState<MessagesState>({ kind: "loading" });
 
   useEffect(() => {
@@ -72,12 +78,20 @@ export function useMessages(
     );
   }, []);
 
+  /** Show a Detected Event as it now is (e.g. just Dismissed) beneath its Anchor Message. */
+  const showEvent = useCallback((event: DetectedEvent) => {
+    setState((current) =>
+      current.kind === "loaded" ? { ...current, messages: withDetectedEvent(current.messages, event) } : current,
+    );
+  }, []);
+
   useEffect(
     () =>
       subscribe((event) => {
         if (event.type === "NEW_MESSAGE" && event.chatId === chatId) addMessage(event.message);
+        if (event.type === "EVENT_DETECTED" && event.event.chatId === chatId) showEvent(event.event);
       }),
-    [chatId, subscribe, addMessage],
+    [chatId, subscribe, addMessage, showEvent],
   );
 
   const loadOlder = useCallback(() => {
@@ -105,5 +119,5 @@ export function useMessages(
     );
   }, [chatId, state]);
 
-  return { state, loadOlder, addMessage };
+  return { state, loadOlder, addMessage, showEvent };
 }

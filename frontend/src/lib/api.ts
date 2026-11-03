@@ -20,10 +20,20 @@ export interface FirstImportStatus {
   error: string | null;
 }
 
+export interface PlanDetectionStatus {
+  /** Whether new Messages are checked for plans. */
+  enabled: boolean;
+  /** Why plan detection is off (null when it is on). */
+  reason: string | null;
+  /** Why the last Plan Model call failed; null once one succeeds. */
+  lastError: string | null;
+}
+
 export interface AppStatus {
   mode: Mode;
   messageSource: MessageSourceStatus;
   firstImport: FirstImportStatus;
+  planDetection: PlanDetectionStatus;
 }
 
 export const PLATFORMS = ["imessage", "instagram", "messenger", "whatsapp", "discord"] as const;
@@ -44,6 +54,28 @@ export interface Chat {
   /** When the last Message was sent (the Chat's last activity if it has none). */
   lastMessageAt: string;
   lastMessage: LastMessage | null;
+  /** An Excluded Chat: never checked for plans. */
+  excluded: boolean;
+}
+
+export type DetectedEventStatus = "pending_review" | "confirmed" | "dismissed";
+
+/** A plan found in a Chat, shown beneath its Anchor Message. */
+export interface DetectedEvent {
+  id: number;
+  chatId: number;
+  anchorMessageId: number;
+  title: string;
+  /** UTC; an all-day plan starts at local midnight of its date. */
+  start: string;
+  /** UTC; null when the Chat didn't say. All-day: midnight of its last day. */
+  end: string | null;
+  allDay: boolean;
+  location: string | null;
+  confidence: number;
+  status: DetectedEventStatus;
+  createdAt: string;
+  updatedAt: string;
 }
 
 export interface Message {
@@ -54,6 +86,8 @@ export interface Message {
   text: string;
   /** True for an Outbound Message: one the user sent, from any client. */
   outbound: boolean;
+  /** The Detected Events (any status) it is the Anchor Message of; usually none or one. */
+  detectedEvents: DetectedEvent[];
 }
 
 /**
@@ -138,6 +172,19 @@ export const api = {
     request<{ chats: Chat[] }>(`/api/chats${query({ platform })}`),
   messages: (chatId: number, options: { before?: number; limit?: number } = {}) =>
     request<MessagePage>(`/api/chats/${chatId}/messages${query(options)}`),
+  /** Make a Chat an Excluded Chat (never checked for plans), or include it again. */
+  setChatExcluded: (chatId: number, excluded: boolean) =>
+    request<Chat>(`/api/chats/${chatId}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ excluded }),
+    }),
+  /** Detected Events, soonest first. */
+  events: (options: { status?: DetectedEventStatus; chatId?: number } = {}) =>
+    request<{ events: DetectedEvent[] }>(`/api/events${query(options)}`),
+  /** Dismiss a Pending Review Detected Event; resolves to it, now Dismissed. */
+  dismissEvent: (eventId: number) =>
+    request<DetectedEvent>(`/api/events/${eventId}/dismiss`, { method: "POST" }),
   /** Send a Message through Beeper Desktop; resolves to the stored Outbound Message. */
   sendMessage: (chatId: number, text: string) =>
     request<Message>(`/api/chats/${chatId}/messages`, {

@@ -165,11 +165,95 @@ class MessageSource(Protocol):
         ...
 
 
-class PlanModel(Protocol):
-    """Turns a window of Messages into a decision about a Detected Event (Gemini).
+@dataclass(frozen=True, slots=True)
+class PlanWindowMessage:
+    """One Message of the window the Plan Model reads. `sent_at` is timezone-aware."""
 
-    Its operations arrive with the Detected Event tickets.
+    sender_name: str
+    text: str
+    sent_at: datetime
+    outbound: bool
+
+
+@dataclass(frozen=True, slots=True)
+class PendingPlan:
+    """A Pending Review Detected Event of the Chat, which the Plan Model may update by `id`.
+
+    Times are timezone-aware (UTC); an all-day plan starts at local midnight of its date.
     """
+
+    id: int
+    title: str
+    start: datetime
+    end: datetime | None
+    all_day: bool
+    location: str | None
+
+
+@dataclass(frozen=True, slots=True)
+class PlanRequest:
+    """What the Plan Model is asked about one Chat.
+
+    `messages` are the Chat's latest Messages, oldest first; `pending` its Pending Review
+    Detected Events; `timezone` the user's IANA time zone, in which relative dates ("Friday",
+    "tomorrow at 7") are resolved against each Message's own `sent_at`; `now` is aware.
+    """
+
+    messages: Sequence[PlanWindowMessage]
+    pending: Sequence[PendingPlan]
+    timezone: str
+    now: datetime
+
+
+@dataclass(frozen=True, slots=True)
+class PlanDetails:
+    """A plan as the Plan Model describes it.
+
+    `start` and `end` are either naive local wall times in the user's time zone or
+    offset-aware; the core resolves them and stores UTC. For an all-day plan only the
+    (local) date of `start`/`end` counts. `end` is None when the Chat didn't say.
+    `confidence` is 0-1: how sure the model is that this is a plan the user will attend.
+    """
+
+    title: str
+    start: datetime
+    end: datetime | None
+    all_day: bool
+    location: str | None
+    confidence: float
+
+
+@dataclass(frozen=True, slots=True)
+class NoPlan:
+    """No new plan, and no change to a pending one."""
+
+
+@dataclass(frozen=True, slots=True)
+class NewPlan:
+    """A plan that isn't one of the pending ones: it becomes a new Detected Event."""
+
+    plan: PlanDetails
+
+
+@dataclass(frozen=True, slots=True)
+class UpdatePlan:
+    """A change to pending Detected Event `event_id` (e.g. a new time): `plan` replaces it."""
+
+    event_id: int
+    plan: PlanDetails
+
+
+PlanDecision = NoPlan | NewPlan | UpdatePlan
+
+
+class PlanModel(Protocol):
+    """Decides, from a Chat's latest Messages, whether they make or change a plan (Gemini).
+
+    It is only ever sent Messages of Chats that aren't Excluded Chats (ADR-0005). It may
+    raise anything on failure; the core logs it and carries on.
+    """
+
+    async def decide(self, request: PlanRequest) -> PlanDecision: ...
 
 
 class Calendar(Protocol):

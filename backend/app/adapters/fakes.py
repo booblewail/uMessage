@@ -4,7 +4,8 @@ import asyncio
 import dataclasses
 import itertools
 import uuid
-from collections.abc import Iterable, Sequence
+from collections import deque
+from collections.abc import Callable, Iterable, Sequence
 from datetime import UTC, datetime
 from typing import Literal
 
@@ -13,7 +14,10 @@ from app.adapters.protocols import (
     MessageSourceStatus,
     MessageSourceUnavailableError,
     NewMessages,
+    NoPlan,
     OlderMessages,
+    PlanDecision,
+    PlanRequest,
     SentMessage,
     SourceChat,
     SourceMessage,
@@ -153,8 +157,47 @@ class FakeMessageSource:
             raise MessageSourceUnavailableError(f"{BEEPER_DESKTOP} isn't running")
 
 
+PlanResponder = Callable[[PlanRequest], PlanDecision]
+
+
 class FakePlanModel:
-    """Stands in for Gemini."""
+    """Stands in for Gemini.
+
+    `calls` records every request, so tests can assert exactly what was sent. Each call takes
+    the next scripted decision from `will_decide(...)`: a decision, an exception (raised), or
+    a function of the request. With none scripted it asks `respond` (demo mode's rules), or
+    decides `NoPlan`. Clear `answering` to hold calls until it is set again; `in_flight` and
+    `most_in_flight` count calls being answered.
+    """
+
+    def __init__(self, respond: PlanResponder | None = None) -> None:
+        self.calls: list[PlanRequest] = []
+        self._script: deque[PlanDecision | Exception | PlanResponder] = deque()
+        self._respond = respond
+        self.answering = asyncio.Event()
+        self.answering.set()
+        self.in_flight = 0
+        self.most_in_flight = 0
+
+    def will_decide(self, *decisions: PlanDecision | Exception | PlanResponder) -> None:
+        self._script.extend(decisions)
+
+    async def decide(self, request: PlanRequest) -> PlanDecision:
+        self.calls.append(request)
+        self.in_flight += 1
+        self.most_in_flight = max(self.most_in_flight, self.in_flight)
+        try:
+            await self.answering.wait()
+            if not self._script:
+                return self._respond(request) if self._respond else NoPlan()
+            decision = self._script.popleft()
+            if isinstance(decision, Exception):
+                raise decision
+            if callable(decision):
+                return decision(request)
+            return decision
+        finally:
+            self.in_flight -= 1
 
 
 class FakeCalendar:

@@ -23,3 +23,21 @@ export function formatMessageTime(iso: string, now: Date = new Date()): string {
   if (isSameDay(date, now)) return date.toLocaleTimeString(undefined, TIME);
   return date.toLocaleString(undefined, { day: "numeric", month: "short", ...TIME });
 }
+
+const EVENT_DAY = { weekday: "short", day: "numeric", month: "short" } as const;
+
+/** When a Detected Event is: "Fri 6 Nov, 19:30–20:30", "Sat 7 Nov · all day". */
+export function formatEventTime(start: string, end: string | null, allDay: boolean): string {
+  const from = new Date(start);
+  if (allDay) {
+    const day = from.toLocaleDateString(undefined, EVENT_DAY);
+    if (!end) return `${day} · all day`;
+    return `${day} – ${new Date(end).toLocaleDateString(undefined, EVENT_DAY)} · all day`;
+  }
+  const text = `${from.toLocaleDateString(undefined, EVENT_DAY)}, ${from.toLocaleTimeString(undefined, TIME)}`;
+  if (!end) return text;
+  const to = new Date(end);
+  return isSameDay(from, to)
+    ? `${text}–${to.toLocaleTimeString(undefined, TIME)}`
+    : `${text} – ${to.toLocaleDateString(undefined, EVENT_DAY)}, ${to.toLocaleTimeString(undefined, TIME)}`;
+}

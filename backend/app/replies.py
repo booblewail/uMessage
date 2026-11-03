@@ -1,5 +1,6 @@
 """Replying from the inbox: send a Message through the Message Source, store it as an Outbound
-Message and push it to the inbox. Nothing is stored unless the Message Source accepted it."""
+Message, hand it to plan detection and push it to the inbox. Nothing is stored unless the
+Message Source accepted it."""
 
 import asyncio
 import logging
@@ -10,6 +11,7 @@ from app import inbox
 from app.adapters.protocols import MessageSource
 from app.live_updates import new_message_event
 from app.models import Chat
+from app.plan_detection import PlanDetection
 from app.schemas import MessageOut
 from app.ws_manager import ConnectionManager
 
@@ -25,6 +27,7 @@ async def send_reply(
     message_source: MessageSource,
     connections: ConnectionManager,
     inbox_lock: asyncio.Lock,
+    plan_detection: PlanDetection,
     *,
     chat_id: int,
     text: str,
@@ -42,5 +45,6 @@ async def send_reply(
         message = await inbox.save_sent_message(session, chat_id, sent, text)
         await session.commit()
         event = await new_message_event(session, message.id)
+    await plan_detection.message_arrived(chat_id, text)  # a reply can make a plan too
     await connections.broadcast(event)
     return event.message

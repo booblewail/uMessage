@@ -53,3 +53,9 @@ async def test_frontend_origin_may_call_the_api(client: AsyncClient) -> None:
 
     assert response.status_code == 200
     assert response.headers["access-control-allow-origin"] == "http://127.0.0.1:3000"
+
+
+async def test_status_reports_plan_detection_on(client: AsyncClient) -> None:
+    body = (await client.get("/api/status")).json()
+
+    assert body["planDetection"] == {"enabled": True, "reason": None, "lastError": None}

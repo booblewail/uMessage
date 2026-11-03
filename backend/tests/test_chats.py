@@ -30,6 +30,7 @@ async def test_a_chat_shows_its_platform_kind_title_and_last_message(
         "kind": "group",
         "title": "Book club",
         "lastMessageAt": chat["lastMessage"]["sentAt"],
+        "excluded": False,
     }
     assert datetime.fromisoformat(chat["lastMessageAt"]) == last.sent_at
     assert chat["lastMessage"] == {

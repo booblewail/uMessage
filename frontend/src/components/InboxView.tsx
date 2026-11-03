@@ -13,6 +13,7 @@ import { FirstImportNotice } from "@/components/FirstImportNotice";
 import { LiveIndicator } from "@/components/LiveIndicator";
 import { MessageSourceBanner } from "@/components/MessageSourceBanner";
 import { MessageThread } from "@/components/MessageThread";
+import { PlanDetectionNotice } from "@/components/PlanDetectionNotice";
 import { PlatformFilter } from "@/components/PlatformFilter";
 
 export function InboxView() {
@@ -25,7 +26,11 @@ export function InboxView() {
   const [selected, setSelected] = useState<Chat | null>(null);
   // Reload the list as First Import adds Chats, and after the live socket reconnects.
   const importKey = firstImport ? `${firstImport.state}:${firstImport.chatsImported}` : "";
-  const chats = useChats(platform, `${importKey}:${socket.reconnects}`, socket.subscribe);
+  const { state: chats, updateChat } = useChats(platform, `${importKey}:${socket.reconnects}`, socket.subscribe);
+  const onChatChanged = (chat: Chat) => {
+    updateChat(chat);
+    setSelected(chat);
+  };
 
   const emptyText =
     firstImport && firstImport.state !== "completed"
@@ -49,6 +54,7 @@ export function InboxView() {
 
       <MessageSourceBanner state={state} />
       {firstImport && <FirstImportNotice firstImport={firstImport} />}
+      {status && <PlanDetectionNotice planDetection={status.planDetection} />}
 
       <div className="grid min-h-0 flex-1 grid-rows-[minmax(0,2fr)_minmax(0,3fr)] gap-4 md:grid-cols-[minmax(0,22rem)_minmax(0,1fr)] md:grid-rows-1">
         <aside className="flex min-h-0 flex-col overflow-hidden rounded-xl border border-slate-200 bg-white">
@@ -72,6 +78,7 @@ export function InboxView() {
               chat={selected}
               subscribe={socket.subscribe}
               reconnects={socket.reconnects}
+              onChatChanged={onChatChanged}
             />
           ) : (
             <div className="flex flex-1 flex-col items-center justify-center gap-2 p-10 text-sm text-slate-500">

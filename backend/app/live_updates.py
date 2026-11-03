@@ -1,5 +1,5 @@
-"""Live updates: after First Import, fetch new Messages from the Message Source, store them and
-push each one to the inbox as `NEW_MESSAGE`.
+"""Live updates: after First Import, fetch new Messages from the Message Source, store them, hand
+each one to plan detection and push it to the inbox as `NEW_MESSAGE`.
 
 It runs as one tracked background task for the life of the app. Each fetch starts from the
 stored cursor and stores the Messages together with the next cursor in one transaction, so
@@ -16,6 +16,7 @@ from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 from app import inbox
 from app.adapters.protocols import ChatKind, MessageSource, MessageSourceUnavailableError
 from app.models import Message
+from app.plan_detection import PlanDetection
 from app.schemas import NewMessageEvent, chat_out, message_out
 from app.ws_manager import ConnectionManager
 
@@ -29,6 +30,7 @@ class LiveUpdates:
         message_source: MessageSource,
         connections: ConnectionManager,
         inbox_lock: asyncio.Lock,
+        plan_detection: PlanDetection,
         *,
         poll_seconds: float,
         retry_seconds: float,
@@ -36,6 +38,7 @@ class LiveUpdates:
         self._sessionmaker = sessionmaker
         self._source = message_source
         self._connections = connections
+        self._plan_detection = plan_detection
         # Held while fetching + storing, and while sending + storing (`inbox.send`), so the
         # echo of a Message being sent is never stored before the Message itself.
         self._inbox_lock = inbox_lock
@@ -72,6 +75,8 @@ class LiveUpdates:
                 await session.commit()
                 events = [await new_message_event(session, message_id) for message_id in stored]
         for event in events:
+            # Scheduled before it is pushed: once the inbox has it, its Chat's check is set.
+            await self._plan_detection.message_arrived(event.chat_id, event.message.text)
             await self._connections.broadcast(event)
 
 

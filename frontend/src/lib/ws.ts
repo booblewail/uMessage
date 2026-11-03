@@ -3,13 +3,18 @@
 // Reconnecting WebSocket to the backend's `/ws`: live inbox events.
 
 import { useCallback, useEffect, useRef, useState } from "react";
-import { API_TOKEN, API_URL, type Chat, type Message } from "@/lib/api";
+import { API_TOKEN, API_URL, type Chat, type DetectedEvent, type Message } from "@/lib/api";
 
 export type InboxEvent =
   /** Sent on every (re)connect: refetch then, to catch up on anything missed while away. */
   | { type: "CONNECTED" }
   /** A Message was stored: the Message as the messages API shows it, and its Chat as listed. */
-  | { type: "NEW_MESSAGE"; chatId: number; message: Message; chat: Chat };
+  | { type: "NEW_MESSAGE"; chatId: number; message: Message; chat: Chat }
+  /**
+   * A Detected Event was created, or changed (revised and maybe re-anchored on a later
+   * Message, or Dismissed): the event as the events API now shows it.
+   */
+  | { type: "EVENT_DETECTED"; change: "created" | "updated"; event: DetectedEvent };
 
 export type InboxListener = (event: InboxEvent) => void;
 /** Listen to inbox events; returns the function that stops listening. */
